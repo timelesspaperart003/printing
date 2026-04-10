@@ -348,6 +348,8 @@ async function loadDetail(page) {
       const parsed = parseContactBlock(rawContactText);
       contactPhone = parsed.phone;
       addresses = parsed.addresses;
+      // 如果總卡有解析到姓名，用它覆蓋標題名稱
+      if (parsed.name) contactName = parsed.name;
     }
 
     // 南灣+自取：不需要姓名、電話、地址
@@ -569,9 +571,13 @@ function parseDesc(text) {
 }
 
 function parseContactBlock(text) {
-  if (!text) return { phone: "", addresses: [] };
+  if (!text) return { phone: "", name: "", addresses: [] };
 
-  const phoneMatch = text.match(/電話[：:]\s*([^\n]+)/);
+  const nameMatch = text.match(/姓名[：:]\s*(\S[^
+]*)/);
+  const phoneMatch = text.match(/電話[：:]\s*(\S[^
+]*)/);
+  const name = nameMatch ? nameMatch[1].trim() : "";
   const phone = phoneMatch ? phoneMatch[1].trim() : "";
 
   const addresses = [];
@@ -604,7 +610,7 @@ function parseContactBlock(text) {
     }
   }
 
-  return { phone, addresses };
+  return { phone, name, addresses };
 }
 
 function getTitle(page) {

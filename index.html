@@ -226,7 +226,7 @@ function doPrint() {
     + "@media print { body { padding: 12mm 16mm 10mm; } }";
 
   var printBody = "<div class='doc-title'>出 貨 單</div>"
-    + "<table class='info-table'><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr><tr><td class='lbl'>標題：</td><td class='val' style='font-weight:500;font-size:14pt;'>" + esc(fieldTitle) + "</td></tr>" + contactRows + "</table>"
+    + "<table class='info-table'><tr><td class='lbl'>標題：</td><td class='val' style='font-weight:500;font-size:14pt;'>" + esc(fieldTitle) + "</td></tr><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr>" + contactRows + "</table>"
     + "<hr class='divider'>"
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(currentTask.itemText) + "</div>"

@@ -290,8 +290,14 @@ function parseContactBlock(text) {
 }
 
 function getTitle(page) {
-  const t = (page.properties["任務"] && page.properties["任務"].title) || [];
-  return t.map(function(x) { return x.plain_text; }).join("") || "（無標題）";
+  // 自動找 title 類型的欄位（相容任務資料庫「任務」和總卡「Name」）
+  const props = page.properties || {};
+  for (const key in props) {
+    if (props[key].type === "title" && props[key].title) {
+      return props[key].title.map(function(x) { return x.plain_text; }).join("") || "（無標題）";
+    }
+  }
+  return "（無標題）";
 }
 
 function getDate(page, prop) {

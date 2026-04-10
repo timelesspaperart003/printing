@@ -68,145 +68,129 @@
 </div>
 
 <script>
-const TASKS_DB = "999689a9776545bba6c8e1557bb90a95";
-let currentTask = null;
-let currentAddresses = [];
+var currentTask = null;
+var currentAddresses = [];
 
-async function notionAPI(endpoint, method, body) {
-  method = method || "GET";
-  const res = await fetch("/api/notion", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpoint, method, body: body || null })
-  });
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  const data = await res.json();
-  if (data.object === "error") throw new Error(data.message);
-  return data;
-}
-
-async function searchTasks() {
-  const q = document.getElementById("search-input").value.trim();
-  const statusEl = document.getElementById("search-status");
-  const listEl = document.getElementById("tasks-list");
+function searchTasks() {
+  var q = document.getElementById("search-input").value.trim();
+  var statusEl = document.getElementById("search-status");
+  var listEl = document.getElementById("tasks-list");
   if (!q) { statusEl.textContent = "請輸入搜尋關鍵字"; return; }
   statusEl.innerHTML = '<span class="spinner"></span>搜尋中...';
   statusEl.className = "status";
   listEl.innerHTML = "";
-  try {
-    const result = await notionAPI("/databases/" + TASKS_DB + "/query", "POST", {
-      filter: { property: "任務", title: { contains: q } },
-      sorts: [{ property: "完成期限", direction: "descending" }],
-      page_size: 15
-    });
-    if (!result.results || result.results.length === 0) { statusEl.textContent = "找不到符合的任務"; return; }
-    statusEl.textContent = "找到 " + result.results.length + " 筆";
-    result.results.forEach(function(page) {
-      const title = getTitle(page);
-      const date = getDate(page, "完成期限");
-      const div = document.createElement("div");
-      div.className = "task-item";
-      div.innerHTML = '<div class="task-item-title">' + esc(title) + '</div><div class="task-item-date">' + (date ? "完成期限：" + date : "未設定日期") + '</div>';
-      div.onclick = function() { loadDetail(page); };
-      listEl.appendChild(div);
-    });
-  } catch(e) {
-    statusEl.textContent = "搜尋失敗：" + e.message;
-    statusEl.className = "status error";
-  }
+
+  google.script.run
+    .withSuccessHandler(function(results) {
+      if (!results || results.error) { statusEl.textContent = "搜尋失敗：" + (results && results.error || "未知錯誤"); statusEl.className = "status error"; return; }
+      if (!results.length) { statusEl.textContent = "找不到符合的任務"; return; }
+      statusEl.textContent = "找到 " + results.length + " 筆";
+      results.forEach(function(task) {
+        var div = document.createElement("div");
+        div.className = "task-item";
+        div.innerHTML = '<div class="task-item-title">' + esc(task.title) + '</div>'
+          + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
+        div.onclick = (function(id) { return function() { loadDetail(id); }; })(task.id);
+        listEl.appendChild(div);
+      });
+    })
+    .withFailureHandler(function(err) { statusEl.textContent = "失敗：" + err.message; statusEl.className = "status error"; })
+    .searchTasks(q);
 }
 
-async function loadDetail(page) {
+function loadDetail(pageId) {
   document.getElementById("view-search").style.display = "none";
   document.getElementById("view-detail").style.display = "block";
-  const detailEl = document.getElementById("detail-content");
-  detailEl.innerHTML = '<div class="status"><span class="spinner"></span>載入中...</div>';
-  try {
-    const title = getTitle(page);
-    const date = getDate(page, "完成期限");
-    const desc = getRichText(page, "說明");
-    const relations = (page.properties["總卡"] && page.properties["總卡"].relation) || [];
-    const parsed = parseDesc(desc);
-    const itemText = parsed.itemText;
-    const nameFromDesc = parsed.nameFromDesc;
-    const phoneFromDesc = parsed.phoneFromDesc;
-    const addrFromDesc = parsed.addrFromDesc;
+  var detailEl = document.getElementById("detail-content");
+  detailEl.innerHTML = '<div class="status"><span class="spinner"></span>載入任務資料...</div>';
 
-    let addresses = [], contactName = "", contactPhone = "", isPickup = false;
+  google.script.run
+    .withSuccessHandler(function(detail) {
+      if (!detail || detail.error) { detailEl.innerHTML = '<div class="status error">載入失敗：' + (detail && detail.error || "未知錯誤") + '</div>'; return; }
+      detailEl.innerHTML = '<div class="status"><span class="spinner"></span>比對客戶資料...</div>';
 
-    if (relations.length > 0) {
-      const contact = await notionAPI("/pages/" + relations[0].id);
-      contactName = getTitle(contact);
-      isPickup = contactName.indexOf("自取") >= 0;
-      const rawText = getRichText(contact, "收件資料 & 說明");
-      const cp = parseContactBlock(rawText);
-      if (cp.name) contactName = cp.name;
-      contactPhone = cp.phone;
-      addresses = cp.addresses;
-    }
+      if (detail.contactNotionName) {
+        google.script.run
+          .withSuccessHandler(function(cust) { renderDetail(detail, cust || { found: false, customers: [] }); })
+          .withFailureHandler(function() { renderDetail(detail, { found: false, customers: [] }); })
+          .getCustomer(detail.contactNotionName);
+      } else {
+        renderDetail(detail, { found: false, customers: [] });
+      }
+    })
+    .withFailureHandler(function(err) { detailEl.innerHTML = '<div class="status error">載入失敗：' + err.message + '</div>'; })
+    .getTaskDetail(pageId);
+}
 
-    const isNanbanPickup = contactName.indexOf("南灣") >= 0 && contactName.indexOf("自取") >= 0;
-    const finalName = nameFromDesc || contactName;
-    const finalPhone = phoneFromDesc || contactPhone;
+function renderDetail(detail, cust) {
+  var detailEl = document.getElementById("detail-content");
+  var isPickup = detail.contactNotionName && detail.contactNotionName.indexOf("自取") >= 0;
+  var isNanbanPickup = detail.contactNotionName && detail.contactNotionName.indexOf("南灣") >= 0 && isPickup;
 
-    currentTask = { title: title, date: date, itemText: itemText, finalName: finalName, finalPhone: finalPhone, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
-    currentAddresses = addresses;
+  var customers = (cust && cust.customers) || [];
+  var sheetName = customers.length > 0 ? customers[0].name : "";
+  var sheetPhone = customers.length > 0 ? customers[0].phone : "";
+  var finalName = detail.nameFromDesc || sheetName;
+  var finalPhone = detail.phoneFromDesc || sheetPhone;
 
-    let addrOptions = "";
-    if (addrFromDesc) addrOptions += '<option value="desc">' + esc(addrFromDesc) + '</option>';
-    addresses.forEach(function(a, i) {
-      addrOptions += '<option value="' + i + '">' + esc(a.label) + '：' + esc(a.address) + '</option>';
-    });
-    if (!addrOptions) addrOptions = '<option value="">（無地址資料）</option>';
+  var addrOptions = "";
+  if (detail.addrFromDesc) addrOptions += '<option value="desc">' + esc(detail.addrFromDesc) + '</option>';
+  customers.forEach(function(c, i) {
+    if (c.address) addrOptions += '<option value="' + i + '">' + esc(c.address) + '</option>';
+  });
+  if (!addrOptions) addrOptions = '<option value="">（無地址資料）</option>';
 
-    let contactFields = "";
-    if (!isNanbanPickup) {
-      contactFields = '<div class="field"><div class="field-label">收件姓名</div><input type="text" id="field-name" value="' + esc(finalName) + '" placeholder="收件姓名" style="margin-top:5px;" /></div>'
-        + '<div class="field"><div class="field-label">電話</div><input type="text" id="field-phone" value="' + esc(finalPhone) + '" placeholder="電話" style="margin-top:5px;" /></div>'
-        + '<div class="field"><div class="field-label">收件地址</div><select id="addr-select" style="margin-top:5px;">' + addrOptions + '</select></div>';
-    }
+  currentTask = { title: detail.title, date: detail.date, itemText: detail.itemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
+  currentAddresses = customers;
 
-    let metaHtml = (date ? "完成期限：" + date : "未設定日期");
-    if (isPickup) metaHtml += '　｜　<strong>自取</strong>';
-    if (isNanbanPickup) metaHtml += ' <span style="color:var(--danger);font-size:12px;">（南灣自取，不印收件資料）</span>';
-    if (contactName) metaHtml += '　｜　客戶：' + esc(contactName);
-
-    detailEl.innerHTML = '<div class="task-title-display">' + esc(title) + '</div>'
-      + '<div class="task-meta">' + metaHtml + '</div>'
-      + '<div class="field"><div class="field-label">商品內容（說明欄）</div><div class="desc-box">' + esc(itemText) + '</div></div>'
-      + contactFields
-      + '<div class="divider"></div>'
-      + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
-  } catch(e) {
-    detailEl.innerHTML = '<div class="status error">載入失敗：' + e.message + '</div>';
+  var contactFields = "";
+  if (!isNanbanPickup) {
+    contactFields = '<div class="field"><div class="field-label">收件姓名</div>'
+      + '<input type="text" id="field-name" value="' + esc(finalName) + '" placeholder="收件姓名" style="margin-top:5px;" /></div>'
+      + '<div class="field"><div class="field-label">電話</div>'
+      + '<input type="text" id="field-phone" value="' + esc(finalPhone) + '" placeholder="電話" style="margin-top:5px;" /></div>'
+      + '<div class="field"><div class="field-label">收件地址</div>'
+      + '<select id="addr-select" style="margin-top:5px;">' + addrOptions + '</select></div>';
   }
+
+  var metaHtml = (detail.date ? "完成期限：" + detail.date : "未設定日期");
+  if (isPickup) metaHtml += '　｜　<strong>自取</strong>';
+  if (isNanbanPickup) metaHtml += ' <span style="color:var(--danger);font-size:12px;">（南灣自取，不印收件資料）</span>';
+  if (detail.contactNotionName) metaHtml += '　｜　客戶：' + esc(detail.contactNotionName);
+
+  detailEl.innerHTML = '<div class="task-title-display">' + esc(detail.title) + '</div>'
+    + '<div class="task-meta">' + metaHtml + '</div>'
+    + '<div class="field"><div class="field-label">商品內容（說明欄）</div>'
+    + '<div class="desc-box">' + esc(detail.itemText) + '</div></div>'
+    + contactFields
+    + '<div class="divider"></div>'
+    + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
 }
 
 function doPrint() {
-  const sel = document.getElementById("addr-select");
-  let addrText = "";
+  var sel = document.getElementById("addr-select");
+  var addrText = "";
   if (sel) {
-    const selVal = sel.value;
+    var selVal = sel.value;
     if (selVal === "desc") {
       addrText = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
     } else {
-      const idx = parseInt(selVal);
-      const addr = (!isNaN(idx) && currentAddresses[idx]) ? currentAddresses[idx] : null;
-      addrText = addr ? addr.address : "";
+      var idx = parseInt(selVal);
+      addrText = (!isNaN(idx) && currentAddresses[idx]) ? currentAddresses[idx].address : "";
     }
   }
-  const finalName = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
-  const finalPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
-  const dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
+  var finalName = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
+  var finalPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
+  var dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
 
-  let contactRows = "";
+  var contactRows = "";
   if (!currentTask.isNanbanPickup) {
     contactRows = "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td></tr>"
       + "<tr><td class='lbl'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
       + "<tr><td class='lbl'>地址：</td><td class='val'>" + esc(addrText) + "</td></tr>";
   }
 
-  const printCSS = "* { box-sizing: border-box; margin: 0; padding: 0; }"
+  var printCSS = "* { box-sizing: border-box; margin: 0; padding: 0; }"
     + "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; padding: 24mm 22mm 20mm; font-size: 13pt; line-height: 1.8; }"
     + ".doc-title { font-size: 22pt; font-weight: 700; letter-spacing: 6px; border-bottom: 2.5px solid #111; padding-bottom: 10px; margin-bottom: 22px; }"
     + ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13pt; }"
@@ -219,14 +203,14 @@ function doPrint() {
     + ".footer { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 8px; font-size: 10pt; color: #aaa; display: flex; justify-content: space-between; }"
     + "@media print { body { padding: 12mm 16mm 10mm; } }";
 
-  const printBody = "<div class='doc-title'>出 貨 單</div>"
+  var printBody = "<div class='doc-title'>出 貨 單</div>"
     + "<table class='info-table'><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr>" + contactRows + "</table>"
     + "<hr class='divider'>"
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(currentTask.itemText) + "</div>"
     + "<div class='footer'><span>雋永紙藝（紙紮百貨）</span><span>artimelesss.com</span></div>";
 
-  const win = window.open("", "_blank", "width=800,height=700");
+  var win = window.open("", "_blank", "width=800,height=700");
   win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>出貨單</title><style>" + printCSS + "</style></head><body>" + printBody + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");
   win.document.close();
 }
@@ -234,78 +218,6 @@ function doPrint() {
 function backToSearch() {
   document.getElementById("view-search").style.display = "block";
   document.getElementById("view-detail").style.display = "none";
-}
-
-function parseDesc(text) {
-  if (!text) return { itemText: "", nameFromDesc: "", phoneFromDesc: "", addrFromDesc: "" };
-  const splitIdx = text.indexOf("寄送資訊");
-  const itemText = splitIdx >= 0 ? text.substring(0, splitIdx).trim() : text.trim();
-  const infoBlock = splitIdx >= 0 ? text.substring(splitIdx) : "";
-  // 冒號後面必須有非空白字元才算有填
-  const nameM = infoBlock.match(/姓名[：:]\s*(\S[^\r\n]*)/u);
-  const phoneM = infoBlock.match(/電話[：:]\s*(\S[^\r\n]*)/u);
-  const addrM = infoBlock.match(/地址[：:]\s*(\S[^\r\n]*)/u);
-  return {
-    itemText: itemText,
-    nameFromDesc: nameM ? nameM[1].trim() : "",
-    phoneFromDesc: phoneM ? phoneM[1].trim() : "",
-    addrFromDesc: addrM ? addrM[1].trim() : ""
-  };
-}
-
-function parseContactBlock(text) {
-  if (!text) return { phone: "", name: "", addresses: [] };
-  const nameM = text.match(/姓名[：:]\s*(\S[^\r\n]*)/u);
-  const phoneM = text.match(/電話[：:]\s*(\S[^\r\n]*)/u);
-  const name = nameM ? nameM[1].trim() : "";
-  const phone = phoneM ? phoneM[1].trim() : "";
-  const addresses = [];
-  const re = /(\d{3,6}[^\n（(，,]{5,60}[號])\s*(?:[（(]([^)）\n]{2,20})[)）])?/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const addr = m[1].trim();
-    const label = m[2] ? m[2].trim() : "地址" + (addresses.length + 1);
-    if (addr && !addresses.find(function(r) { return r.address === addr; })) {
-      addresses.push({ label: label, address: addr });
-    }
-  }
-  if (addresses.length === 0) {
-    const lines = text.split(/\n/).map(function(l) { return l.trim(); }).filter(Boolean);
-    let cityLabel = "";
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const cityMatch = line.match(/^(台北|台中|台南|高雄|嘉義|桃園|新竹|彰化|苗栗|花蓮|宜蘭|屏東|台東|基隆)[：:]/);
-      if (cityMatch) cityLabel = cityMatch[1];
-      const addrMatch = line.match(/\d{3,6}[^\n（(]{5,50}[號]/);
-      if (addrMatch) {
-        const bracketMatch = line.match(/[（(]([^)）]{2,20})[)）]/);
-        const label = bracketMatch ? bracketMatch[1] : (cityLabel || "地址" + (addresses.length + 1));
-        if (!addresses.find(function(r) { return r.address === addrMatch[0].trim(); })) {
-          addresses.push({ label: label, address: addrMatch[0].trim() });
-        }
-      }
-    }
-  }
-  return { phone: phone, name: name, addresses: addresses };
-}
-
-function getTitle(page) {
-  // 自動找 title 類型的欄位（相容任務資料庫「任務」和總卡「Name」）
-  const props = page.properties || {};
-  for (const key in props) {
-    if (props[key].type === "title" && props[key].title) {
-      return props[key].title.map(function(x) { return x.plain_text; }).join("") || "（無標題）";
-    }
-  }
-  return "（無標題）";
-}
-
-function getDate(page, prop) {
-  return (page.properties[prop] && page.properties[prop].date && page.properties[prop].date.start) || "";
-}
-
-function getRichText(page, prop) {
-  return ((page.properties[prop] && page.properties[prop].rich_text) || []).map(function(x) { return x.plain_text; }).join("");
 }
 
 function esc(str) {

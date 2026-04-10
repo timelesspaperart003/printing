@@ -2,12 +2,226 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="0;url=https://script.google.com/macros/s/AKfycbx32ewy-B-1_dJ3NXlFgWI18U6cFFUJh5ILDNtmLDImuzWNg-rSJIYEcMmVTz4Yt8a-Jw/exec">
-<title>出貨單列印工具</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>出貨單列印工具｜雋永紙藝</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f5f2; --surface: #ffffff; --border: #e0dbd4; --border-strong: #c8c2ba;
+    --text: #1a1814; --text-muted: #7a7570; --accent: #2d2926; --accent-light: #f0ede8;
+    --danger: #c0392b; --radius: 10px; --radius-sm: 6px; --shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  body { font-family: "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem 4rem; }
+  .app { width: 100%; max-width: 560px; }
+  .header { margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: 1px; }
+  .header p { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 1rem; }
+  .search-row { display: flex; gap: 8px; }
+  input[type="text"], select { font-family: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; outline: none; transition: border-color 0.15s; width: 100%; -webkit-appearance: none; }
+  input[type="text"]:focus, select:focus { border-color: var(--accent); }
+  button { font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer; border-radius: var(--radius-sm); padding: 10px 18px; transition: background 0.15s; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+  button:active { opacity: 0.7; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); width: 100%; padding: 13px; font-size: 16px; letter-spacing: 1px; }
+  button.ghost { background: none; border: none; color: var(--text-muted); padding: 0 0 1.25rem 0; font-size: 14px; }
+  .status { font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0 4px; }
+  .status.error { color: var(--danger); }
+  .task-item { padding: 13px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 6px; background: var(--surface); }
+  .task-item:active { background: var(--accent-light); }
+  .task-item-title { font-size: 15px; font-weight: 500; }
+  .task-item-date { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  .field-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+  .field { margin-bottom: 1rem; }
+  .task-title-display { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+  .task-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .desc-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; max-height: 180px; overflow-y: auto; }
+  .divider { height: 1px; background: var(--border); margin: 1rem 0; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </head>
 <body>
+<div class="app">
+  <div class="header">
+    <h1>出貨單列印工具</h1>
+    <p>雋永紙藝（紙紮百貨）</p>
+  </div>
+  <div id="view-search">
+    <div class="card">
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="輸入任務名稱關鍵字..." />
+        <button onclick="searchTasks()">搜尋</button>
+      </div>
+      <div id="search-status" class="status">輸入關鍵字後按搜尋</div>
+    </div>
+    <div id="tasks-list"></div>
+  </div>
+  <div id="view-detail" style="display:none;">
+    <button class="ghost" onclick="backToSearch()">← 返回搜尋</button>
+    <div class="card" id="detail-content">
+      <div class="status"><span class="spinner"></span>載入中...</div>
+    </div>
+  </div>
+</div>
+
 <script>
-window.location.replace("https://script.google.com/macros/s/AKfycbx32ewy-B-1_dJ3NXlFgWI18U6cFFUJh5ILDNtmLDImuzWNg-rSJIYEcMmVTz4Yt8a-Jw/exec");
+var GAS_URL = "https://script.google.com/macros/s/AKfycbx32ewy-B-1_dJ3NXlFgWI18U6cFFUJh5ILDNtmLDImuzWNg-rSJIYEcMmVTz4Yt8a-Jw/exec";
+var currentTask = null;
+var currentAddresses = [];
+
+async function gasAPI(params) {
+  var url = GAS_URL + "?" + Object.keys(params).map(function(k) {
+    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+  }).join("&");
+  var res = await fetch(url);
+  return await res.json();
+}
+
+async function searchTasks() {
+  var q = document.getElementById("search-input").value.trim();
+  var statusEl = document.getElementById("search-status");
+  var listEl = document.getElementById("tasks-list");
+  if (!q) { statusEl.textContent = "請輸入搜尋關鍵字"; return; }
+  statusEl.innerHTML = '<span class="spinner"></span>搜尋中...';
+  statusEl.className = "status";
+  listEl.innerHTML = "";
+  try {
+    var results = await gasAPI({ action: "search", q: q });
+    if (results.error) throw new Error(results.error);
+    if (!results.length) { statusEl.textContent = "找不到符合的任務"; return; }
+    statusEl.textContent = "找到 " + results.length + " 筆";
+    results.forEach(function(task) {
+      var div = document.createElement("div");
+      div.className = "task-item";
+      div.innerHTML = '<div class="task-item-title">' + esc(task.title) + '</div>'
+        + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
+      div.onclick = function() { loadDetail(task.id); };
+      listEl.appendChild(div);
+    });
+  } catch(e) {
+    statusEl.textContent = "搜尋失敗：" + e.message;
+    statusEl.className = "status error";
+  }
+}
+
+async function loadDetail(pageId) {
+  document.getElementById("view-search").style.display = "none";
+  document.getElementById("view-detail").style.display = "block";
+  var detailEl = document.getElementById("detail-content");
+  detailEl.innerHTML = '<div class="status"><span class="spinner"></span>載入中...</div>';
+  try {
+    var detail = await gasAPI({ action: "detail", pageId: pageId });
+    if (detail.error) throw new Error(detail.error);
+    renderDetail(detail);
+  } catch(e) {
+    detailEl.innerHTML = '<div class="status error">載入失敗：' + e.message + '</div>';
+  }
+}
+
+function renderDetail(detail) {
+  var detailEl = document.getElementById("detail-content");
+  var isPickup = detail.contactNotionName && detail.contactNotionName.indexOf("自取") >= 0;
+  var isNanbanPickup = detail.contactNotionName && detail.contactNotionName.indexOf("南灣") >= 0 && isPickup;
+  var customers = detail.customers || [];
+  var sheetName = customers.length > 0 ? customers[0].name : "";
+  var sheetPhone = customers.length > 0 ? customers[0].phone : "";
+  var finalName = detail.nameFromDesc || sheetName;
+  var finalPhone = detail.phoneFromDesc || sheetPhone;
+
+  var addrOptions = "";
+  if (detail.addrFromDesc) addrOptions += '<option value="desc">' + esc(detail.addrFromDesc) + '</option>';
+  customers.forEach(function(c, i) {
+    if (c.address) addrOptions += '<option value="' + i + '">' + esc(c.address) + '</option>';
+  });
+  if (!addrOptions) addrOptions = '<option value="">（無地址資料）</option>';
+
+  currentTask = { title: detail.title, date: detail.date, itemText: detail.itemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
+  currentAddresses = customers;
+
+  var contactFields = "";
+  if (!isNanbanPickup) {
+    contactFields = '<div class="field"><div class="field-label">收件姓名</div>'
+      + '<input type="text" id="field-name" value="' + esc(finalName) + '" placeholder="收件姓名" style="margin-top:5px;" /></div>'
+      + '<div class="field"><div class="field-label">電話</div>'
+      + '<input type="text" id="field-phone" value="' + esc(finalPhone) + '" placeholder="電話" style="margin-top:5px;" /></div>'
+      + '<div class="field"><div class="field-label">收件地址</div>'
+      + '<select id="addr-select" style="margin-top:5px;">' + addrOptions + '</select></div>';
+  }
+
+  var metaHtml = (detail.date ? "完成期限：" + detail.date : "未設定日期");
+  if (isPickup) metaHtml += '　｜　<strong>自取</strong>';
+  if (isNanbanPickup) metaHtml += ' <span style="color:var(--danger);font-size:12px;">（南灣自取，不印收件資料）</span>';
+  if (detail.contactNotionName) metaHtml += '　｜　客戶：' + esc(detail.contactNotionName);
+
+  detailEl.innerHTML = '<div class="task-title-display">' + esc(detail.title) + '</div>'
+    + '<div class="task-meta">' + metaHtml + '</div>'
+    + '<div class="field"><div class="field-label">商品內容（說明欄）</div>'
+    + '<div class="desc-box">' + esc(detail.itemText) + '</div></div>'
+    + contactFields
+    + '<div class="divider"></div>'
+    + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
+}
+
+function doPrint() {
+  var sel = document.getElementById("addr-select");
+  var addrText = "";
+  if (sel) {
+    var selVal = sel.value;
+    if (selVal === "desc") {
+      addrText = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
+    } else {
+      var idx = parseInt(selVal);
+      addrText = (!isNaN(idx) && currentAddresses[idx]) ? currentAddresses[idx].address : "";
+    }
+  }
+  var finalName = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
+  var finalPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
+  var dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
+
+  var contactRows = "";
+  if (!currentTask.isNanbanPickup) {
+    contactRows = "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td></tr>"
+      + "<tr><td class='lbl'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
+      + "<tr><td class='lbl'>地址：</td><td class='val'>" + esc(addrText) + "</td></tr>";
+  }
+
+  var printCSS = "* { box-sizing: border-box; margin: 0; padding: 0; }"
+    + "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; padding: 24mm 22mm 20mm; font-size: 13pt; line-height: 1.8; }"
+    + ".doc-title { font-size: 22pt; font-weight: 700; letter-spacing: 6px; border-bottom: 2.5px solid #111; padding-bottom: 10px; margin-bottom: 22px; }"
+    + ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13pt; }"
+    + ".info-table td { padding: 6px 0; vertical-align: top; }"
+    + ".info-table td.lbl { color: #444; white-space: nowrap; width: 100px; font-weight: 500; }"
+    + ".info-table td.val { border-bottom: 1px solid #ddd; padding-bottom: 6px; padding-left: 4px; }"
+    + ".divider { border: none; border-top: 1.5px dashed #bbb; margin: 18px 0; }"
+    + ".items-label { font-size: 10pt; color: #888; letter-spacing: 1px; margin-bottom: 6px; }"
+    + ".items-content { font-size: 13pt; white-space: pre-wrap; line-height: 1.9; min-height: 60px; }"
+    + ".footer { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 8px; font-size: 10pt; color: #aaa; display: flex; justify-content: space-between; }"
+    + "@media print { body { padding: 12mm 16mm 10mm; } }";
+
+  var printBody = "<div class='doc-title'>出 貨 單</div>"
+    + "<table class='info-table'><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr>" + contactRows + "</table>"
+    + "<hr class='divider'>"
+    + "<div class='items-label'>商品內容</div>"
+    + "<div class='items-content'>" + esc(currentTask.itemText) + "</div>"
+    + "<div class='footer'><span>雋永紙藝（紙紮百貨）</span><span>artimelesss.com</span></div>";
+
+  var win = window.open("", "_blank", "width=800,height=700");
+  win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>出貨單</title><style>" + printCSS + "</style></head><body>" + printBody + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");
+  win.document.close();
+}
+
+function backToSearch() {
+  document.getElementById("view-search").style.display = "block";
+  document.getElementById("view-detail").style.display = "none";
+}
+
+function esc(str) {
+  return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+document.getElementById("search-input").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") searchTasks();
+});
 </script>
 </body>
 </html>

@@ -6,234 +6,49 @@
 <title>出貨單列印工具｜雋永紙藝</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #f7f5f2;
-    --surface: #ffffff;
-    --border: #e0dbd4;
-    --border-strong: #c8c2ba;
-    --text: #1a1814;
-    --text-muted: #7a7570;
-    --text-hint: #b0aaa4;
-    --accent: #2d2926;
-    --accent-light: #f0ede8;
-    --danger: #c0392b;
-    --radius: 10px;
-    --radius-sm: 6px;
-    --shadow: 0 1px 4px rgba(0,0,0,0.08);
+    --bg: #f7f5f2; --surface: #ffffff; --border: #e0dbd4; --border-strong: #c8c2ba;
+    --text: #1a1814; --text-muted: #7a7570; --accent: #2d2926; --accent-light: #f0ede8;
+    --danger: #c0392b; --radius: 10px; --radius-sm: 6px; --shadow: 0 1px 4px rgba(0,0,0,0.08);
   }
-
-  body {
-    font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 2rem 1rem 4rem;
-  }
-
-  .app {
-    width: 100%;
-    max-width: 560px;
-  }
-
-  .header {
-    margin-bottom: 2rem;
-    padding-bottom: 1.25rem;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .header h1 {
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    color: var(--text);
-  }
-
-  .header p {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    box-shadow: var(--shadow);
-    margin-bottom: 1rem;
-  }
-
-  .search-row {
-    display: flex;
-    gap: 8px;
-  }
-
-  input[type="text"], select {
-    font-family: inherit;
-    font-size: 14px;
-    color: var(--text);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 9px 12px;
-    outline: none;
-    transition: border-color 0.15s;
-    width: 100%;
-  }
-
-  input[type="text"]:focus, select:focus {
-    border-color: var(--accent);
-  }
-
-  button {
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    padding: 9px 18px;
-    transition: background 0.15s, transform 0.1s;
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
-    color: var(--text);
-    white-space: nowrap;
-  }
-
+  body { font-family: "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem 4rem; }
+  .app { width: 100%; max-width: 560px; }
+  .header { margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: 1px; }
+  .header p { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 1rem; }
+  .search-row { display: flex; gap: 8px; }
+  input[type="text"], select { font-family: inherit; font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 12px; outline: none; transition: border-color 0.15s; width: 100%; }
+  input[type="text"]:focus, select:focus { border-color: var(--accent); }
+  button { font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; border-radius: var(--radius-sm); padding: 9px 18px; transition: background 0.15s, transform 0.1s; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); white-space: nowrap; }
   button:hover { background: var(--accent-light); }
   button:active { transform: scale(0.98); }
-
-  button.primary {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
-    width: 100%;
-    padding: 11px;
-    font-size: 15px;
-    letter-spacing: 1px;
-  }
-
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); width: 100%; padding: 11px; font-size: 15px; letter-spacing: 1px; }
   button.primary:hover { background: #403b36; }
-
-  button.ghost {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    padding: 0 0 1.25rem 0;
-    font-size: 13px;
-  }
-
+  button.ghost { background: none; border: none; color: var(--text-muted); padding: 0 0 1.25rem 0; font-size: 13px; }
   button.ghost:hover { color: var(--text); background: none; }
-
-  .status {
-    font-size: 13px;
-    color: var(--text-muted);
-    text-align: center;
-    padding: 12px 0 4px;
-  }
-
+  .status { font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0 4px; }
   .status.error { color: var(--danger); }
-
-  .task-item {
-    padding: 11px 14px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    margin-bottom: 6px;
-    background: var(--surface);
-    transition: background 0.12s, border-color 0.12s;
-  }
-
+  .task-item { padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 6px; background: var(--surface); transition: background 0.12s, border-color 0.12s; }
   .task-item:hover { background: var(--accent-light); border-color: var(--border-strong); }
-  .task-item:last-child { margin-bottom: 0; }
-
   .task-item-title { font-size: 14px; font-weight: 500; }
   .task-item-date { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-
-  .field-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 5px;
-  }
-
+  .field-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
   .field { margin-bottom: 1rem; }
-  .field:last-child { margin-bottom: 0; }
-
-  .task-title-display {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 3px;
-  }
-
-  .task-meta {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .desc-box {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 10px 12px;
-    font-size: 13px;
-    line-height: 1.7;
-    white-space: pre-wrap;
-    max-height: 180px;
-    overflow-y: auto;
-    color: var(--text);
-  }
-
-  .divider {
-    height: 1px;
-    background: var(--border);
-    margin: 1rem 0;
-  }
-
-  .spinner {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    vertical-align: middle;
-    margin-right: 6px;
-  }
-
+  .task-title-display { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+  .task-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .desc-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; max-height: 180px; overflow-y: auto; }
+  .divider { height: 1px; background: var(--border); margin: 1rem 0; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ===== PRINT STYLES ===== */
-  @media print {
-    body { display: block; background: white; padding: 0; }
-    .app, .no-print { display: none !important; }
-    #print-area { display: block !important; }
-  }
-
-  #print-area {
-    display: none;
-    font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
-  }
 </style>
 </head>
 <body>
-
-<div class="app" id="main-app">
+<div class="app">
   <div class="header">
     <h1>出貨單列印工具</h1>
     <p>雋永紙藝（紙紮百貨）</p>
   </div>
-
-  <!-- 搜尋畫面 -->
   <div id="view-search">
     <div class="card">
       <div class="search-row">
@@ -244,8 +59,6 @@
     </div>
     <div id="tasks-list"></div>
   </div>
-
-  <!-- 任務詳情畫面 -->
   <div id="view-detail" style="display:none;">
     <button class="ghost" onclick="backToSearch()">← 返回搜尋</button>
     <div class="card" id="detail-content">
@@ -254,23 +67,19 @@
   </div>
 </div>
 
-<!-- 列印區（僅列印時顯示） -->
-<div id="print-area"></div>
-
 <script>
 const TASKS_DB = "999689a9776545bba6c8e1557bb90a95";
-const CONTACTS_DB = "9f3b32ddc91047a1ae538d47d4df126d";
-
 let currentTask = null;
 let currentAddresses = [];
 
-async function notionAPI(endpoint, method = "GET", body = null) {
+async function notionAPI(endpoint, method, body) {
+  method = method || "GET";
   const res = await fetch("/api/notion", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpoint, method, body })
+    body: JSON.stringify({ endpoint, method, body: body || null })
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
   if (data.object === "error") throw new Error(data.message);
   return data;
@@ -280,37 +89,25 @@ async function searchTasks() {
   const q = document.getElementById("search-input").value.trim();
   const statusEl = document.getElementById("search-status");
   const listEl = document.getElementById("tasks-list");
-
-  if (!q) { statusEl.textContent = "請輸入搜尋關鍵字"; statusEl.className = "status"; return; }
-
+  if (!q) { statusEl.textContent = "請輸入搜尋關鍵字"; return; }
   statusEl.innerHTML = '<span class="spinner"></span>搜尋中...';
   statusEl.className = "status";
   listEl.innerHTML = "";
-
   try {
-    const result = await notionAPI(`/databases/${TASKS_DB}/query`, "POST", {
+    const result = await notionAPI("/databases/" + TASKS_DB + "/query", "POST", {
       filter: { property: "任務", title: { contains: q } },
       sorts: [{ property: "完成期限", direction: "descending" }],
       page_size: 15
     });
-
-    if (!result.results || result.results.length === 0) {
-      statusEl.textContent = "找不到符合的任務";
-      return;
-    }
-
-    statusEl.textContent = `找到 ${result.results.length} 筆`;
-
-    result.results.forEach(page => {
+    if (!result.results || result.results.length === 0) { statusEl.textContent = "找不到符合的任務"; return; }
+    statusEl.textContent = "找到 " + result.results.length + " 筆";
+    result.results.forEach(function(page) {
       const title = getTitle(page);
       const date = getDate(page, "完成期限");
       const div = document.createElement("div");
       div.className = "task-item";
-      div.innerHTML = `
-        <div class="task-item-title">${escHtml(title)}</div>
-        <div class="task-item-date">${date ? "完成期限：" + date : "未設定日期"}</div>
-      `;
-      div.onclick = () => loadDetail(page);
+      div.innerHTML = '<div class="task-item-title">' + esc(title) + '</div><div class="task-item-date">' + (date ? "完成期限：" + date : "未設定日期") + '</div>';
+      div.onclick = function() { loadDetail(page); };
       listEl.appendChild(div);
     });
   } catch(e) {
@@ -324,223 +121,113 @@ async function loadDetail(page) {
   document.getElementById("view-detail").style.display = "block";
   const detailEl = document.getElementById("detail-content");
   detailEl.innerHTML = '<div class="status"><span class="spinner"></span>載入中...</div>';
-
   try {
     const title = getTitle(page);
     const date = getDate(page, "完成期限");
     const desc = getRichText(page, "說明");
-    const relations = page.properties["總卡"]?.relation || [];
+    const relations = (page.properties["總卡"] && page.properties["總卡"].relation) || [];
+    const parsed = parseDesc(desc);
+    const itemText = parsed.itemText;
+    const nameFromDesc = parsed.nameFromDesc;
+    const phoneFromDesc = parsed.phoneFromDesc;
+    const addrFromDesc = parsed.addrFromDesc;
 
-    // Parse desc: split at 寄送資訊
-    const { itemText, nameFromDesc, phoneFromDesc, addrFromDesc } = parseDesc(desc);
-
-    let addresses = [];
-    let contactName = "";
-    let contactPhone = "";
-    let rawContactText = "";
-    let isPickup = false;
+    let addresses = [], contactName = "", contactPhone = "", isPickup = false;
 
     if (relations.length > 0) {
-      const contact = await notionAPI(`/pages/${relations[0].id}`);
+      const contact = await notionAPI("/pages/" + relations[0].id);
       contactName = getTitle(contact);
-      isPickup = contactName.includes("自取");
-      rawContactText = getRichText(contact, "收件資料 & 說明");
-      const parsed = parseContactBlock(rawContactText);
-      contactPhone = parsed.phone;
-      addresses = parsed.addresses;
-      // 如果總卡有解析到姓名，用它覆蓋標題名稱
-      if (parsed.name) contactName = parsed.name;
+      isPickup = contactName.indexOf("自取") >= 0;
+      const rawText = getRichText(contact, "收件資料 & 說明");
+      const cp = parseContactBlock(rawText);
+      if (cp.name) contactName = cp.name;
+      contactPhone = cp.phone;
+      addresses = cp.addresses;
     }
 
-    // 南灣+自取：不需要姓名、電話、地址
-    const isNanbanPickup = contactName.includes("南灣") && contactName.includes("自取");
-
+    const isNanbanPickup = contactName.indexOf("南灣") >= 0 && contactName.indexOf("自取") >= 0;
     const finalName = nameFromDesc || contactName;
     const finalPhone = phoneFromDesc || contactPhone;
 
-    currentTask = { title, date, itemText, finalName, finalPhone, isPickup, isNanbanPickup };
+    currentTask = { title: title, date: date, itemText: itemText, finalName: finalName, finalPhone: finalPhone, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
     currentAddresses = addresses;
 
-    // Address: if desc has address, put it first as option
     let addrOptions = "";
-    if (addrFromDesc) {
-      addrOptions += `<option value="desc">${escHtml(addrFromDesc)}</option>`;
+    if (addrFromDesc) addrOptions += '<option value="desc">' + esc(addrFromDesc) + '</option>';
+    addresses.forEach(function(a, i) {
+      addrOptions += '<option value="' + i + '">' + esc(a.label) + '：' + esc(a.address) + '</option>';
+    });
+    if (!addrOptions) addrOptions = '<option value="">（無地址資料）</option>';
+
+    let contactFields = "";
+    if (!isNanbanPickup) {
+      contactFields = '<div class="field"><div class="field-label">收件姓名</div><input type="text" id="field-name" value="' + esc(finalName) + '" placeholder="收件姓名" style="margin-top:5px;" /></div>'
+        + '<div class="field"><div class="field-label">電話</div><input type="text" id="field-phone" value="' + esc(finalPhone) + '" placeholder="電話" style="margin-top:5px;" /></div>'
+        + '<div class="field"><div class="field-label">收件地址</div><select id="addr-select" style="margin-top:5px;">' + addrOptions + '</select></div>';
     }
-    addrOptions += addresses.map((a, i) =>
-      `<option value="${i}">${escHtml(a.label)}：${escHtml(a.address)}</option>`
-    ).join("");
-    if (!addrOptions) addrOptions = `<option value="">（無地址資料）</option>`;
 
-    // 南灣+自取：不顯示也不列印收件姓名、電話、地址
-    const contactFields = isNanbanPickup ? "" : `
-      <div class="field">
-        <div class="field-label">收件姓名</div>
-        <input type="text" id="field-name" value="${escHtml(finalName)}" placeholder="收件姓名" style="margin-top:5px;" />
-      </div>
-      <div class="field">
-        <div class="field-label">電話</div>
-        <input type="text" id="field-phone" value="${escHtml(finalPhone)}" placeholder="電話" style="margin-top:5px;" />
-      </div>
-      <div class="field">
-        <div class="field-label">收件地址</div>
-        <select id="addr-select" style="margin-top:5px;">${addrOptions}</select>
-      </div>`;
+    let metaHtml = (date ? "完成期限：" + date : "未設定日期");
+    if (isPickup) metaHtml += '　｜　<strong>自取</strong>';
+    if (isNanbanPickup) metaHtml += ' <span style="color:var(--danger);font-size:12px;">（南灣自取，不印收件資料）</span>';
+    if (contactName) metaHtml += '　｜　客戶：' + esc(contactName);
 
-    detailEl.innerHTML = `
-      <div class="task-title-display">${escHtml(title)}</div>
-      <div class="task-meta">
-        ${date ? "完成期限：" + date : "未設定日期"}
-        ${isPickup ? "　｜　<strong>自取</strong>" : ""}
-        ${isNanbanPickup ? ' <span style="color:var(--danger);font-size:12px;">（南灣自取，不印收件資料）</span>' : ""}
-        ${contactName ? "　｜　客戶：" + escHtml(contactName) : ""}
-      </div>
-      <div class="field">
-        <div class="field-label">商品內容（說明欄）</div>
-        <div class="desc-box">${escHtml(itemText) || "（無內容）"}</div>
-      </div>
-      ${contactFields}
-      <div class="divider"></div>
-      <button class="primary" onclick="doPrint()">列印出貨單</button>
-    `;
+    detailEl.innerHTML = '<div class="task-title-display">' + esc(title) + '</div>'
+      + '<div class="task-meta">' + metaHtml + '</div>'
+      + '<div class="field"><div class="field-label">商品內容（說明欄）</div><div class="desc-box">' + esc(itemText) + '</div></div>'
+      + contactFields
+      + '<div class="divider"></div>'
+      + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
   } catch(e) {
-    detailEl.innerHTML = `<div class="status error">載入失敗：${e.message}</div>`;
+    detailEl.innerHTML = '<div class="status error">載入失敗：' + e.message + '</div>';
   }
 }
 
 function doPrint() {
   const sel = document.getElementById("addr-select");
-  const selVal = sel?.value;
   let addrText = "";
-  if (selVal === "desc") {
-    addrText = sel.options[sel.selectedIndex]?.text || "";
-  } else {
-    const idx = parseInt(selVal);
-    const addr = (!isNaN(idx) && currentAddresses[idx]) ? currentAddresses[idx] : null;
-    addrText = addr ? addr.address : "（未選擇地址）";
+  if (sel) {
+    const selVal = sel.value;
+    if (selVal === "desc") {
+      addrText = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
+    } else {
+      const idx = parseInt(selVal);
+      const addr = (!isNaN(idx) && currentAddresses[idx]) ? currentAddresses[idx] : null;
+      addrText = addr ? addr.address : "";
+    }
+  }
+  const finalName = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
+  const finalPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
+  const dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
+
+  let contactRows = "";
+  if (!currentTask.isNanbanPickup) {
+    contactRows = "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td></tr>"
+      + "<tr><td class='lbl'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
+      + "<tr><td class='lbl'>地址：</td><td class='val'>" + esc(addrText) + "</td></tr>";
   }
 
-  const finalName = document.getElementById("field-name")?.value || "";
-  const finalPhone = document.getElementById("field-phone")?.value || "";
+  const printCSS = "* { box-sizing: border-box; margin: 0; padding: 0; }"
+    + "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; padding: 24mm 22mm 20mm; font-size: 13pt; line-height: 1.8; }"
+    + ".doc-title { font-size: 22pt; font-weight: 700; letter-spacing: 6px; border-bottom: 2.5px solid #111; padding-bottom: 10px; margin-bottom: 22px; }"
+    + ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13pt; }"
+    + ".info-table td { padding: 6px 0; vertical-align: top; }"
+    + ".info-table td.lbl { color: #444; white-space: nowrap; width: 100px; font-weight: 500; }"
+    + ".info-table td.val { border-bottom: 1px solid #ddd; padding-bottom: 6px; padding-left: 4px; }"
+    + ".divider { border: none; border-top: 1.5px dashed #bbb; margin: 18px 0; }"
+    + ".items-label { font-size: 10pt; color: #888; letter-spacing: 1px; margin-bottom: 6px; }"
+    + ".items-content { font-size: 13pt; white-space: pre-wrap; line-height: 1.9; min-height: 60px; }"
+    + ".footer { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 8px; font-size: 10pt; color: #aaa; display: flex; justify-content: space-between; }"
+    + "@media print { body { padding: 12mm 16mm 10mm; } }";
 
-  const dateLabel = currentTask.date
-    ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "")
-    : (currentTask.isPickup ? "（自取）" : "");
-
-  // 南灣自取：列印時不顯示收件姓名、電話、地址
-  const contactRows = currentTask.isNanbanPickup ? "" : `
-  <tr>
-    <td class="lbl">收件姓名：</td>
-    <td class="val">${escHtml(finalName)}</td>
-  </tr>
-  <tr>
-    <td class="lbl">電話：</td>
-    <td class="val">${escHtml(finalPhone)}</td>
-  </tr>
-  <tr>
-    <td class="lbl">地址：</td>
-    <td class="val">${escHtml(addrText)}</td>
-  </tr>`;
+  const printBody = "<div class='doc-title'>出 貨 單</div>"
+    + "<table class='info-table'><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr>" + contactRows + "</table>"
+    + "<hr class='divider'>"
+    + "<div class='items-label'>商品內容</div>"
+    + "<div class='items-content'>" + esc(currentTask.itemText) + "</div>"
+    + "<div class='footer'><span>雋永紙藝（紙紮百貨）</span><span>artimelesss.com</span></div>";
 
   const win = window.open("", "_blank", "width=800,height=700");
-  win.document.write(`<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
-<title>出貨單</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
-    color: #111;
-    background: white;
-    padding: 24mm 22mm 20mm;
-    font-size: 13pt;
-    line-height: 1.8;
-  }
-  .doc-title {
-    font-size: 22pt;
-    font-weight: 700;
-    letter-spacing: 6px;
-    border-bottom: 2.5px solid #111;
-    padding-bottom: 10px;
-    margin-bottom: 22px;
-  }
-  .info-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-    font-size: 13pt;
-  }
-  .info-table td {
-    padding: 6px 0;
-    vertical-align: top;
-  }
-  .info-table td.lbl {
-    color: #444;
-    white-space: nowrap;
-    width: 90px;
-    font-weight: 500;
-  }
-  .info-table td.val {
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 6px;
-    padding-left: 4px;
-  }
-  .divider {
-    border: none;
-    border-top: 1.5px dashed #bbb;
-    margin: 18px 0;
-  }
-  .items-label {
-    font-size: 10pt;
-    color: #888;
-    letter-spacing: 1px;
-    margin-bottom: 6px;
-  }
-  .items-content {
-    font-size: 13pt;
-    white-space: pre-wrap;
-    line-height: 1.9;
-    min-height: 60px;
-  }
-  .footer {
-    margin-top: 30px;
-    border-top: 1px solid #ddd;
-    padding-top: 8px;
-    font-size: 10pt;
-    color: #aaa;
-    display: flex;
-    justify-content: space-between;
-  }
-  @media print {
-    body { padding: 12mm 16mm 10mm; }
-  }
-</style>
-</head>
-<body>
-<div class="doc-title">出 貨 單</div>
-
-<table class="info-table">
-  <tr>
-    <td class="lbl">日期：</td>
-    <td class="val">${escHtml(dateLabel)}</td>
-  </tr>
-  ${contactRows}
-</table>
-
-<hr class="divider">
-
-<div class="items-label">商品內容</div>
-<div class="items-content">${escHtml(currentTask.itemText)}</div>
-
-<div class="footer">
-  <span>雋永紙藝（紙紮百貨）</span>
-  <span>artimelesss.com</span>
-</div>
-
-<script>window.onload = function(){ window.print(); };<\/script>
-</body>
-</html>`);
+  win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>出貨單</title><style>" + printCSS + "</style></head><body>" + printBody + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");
   win.document.close();
 }
 
@@ -551,86 +238,75 @@ function backToSearch() {
 
 function parseDesc(text) {
   if (!text) return { itemText: "", nameFromDesc: "", phoneFromDesc: "", addrFromDesc: "" };
-
-  // Split at 寄送資訊
   const splitIdx = text.indexOf("寄送資訊");
   const itemText = splitIdx >= 0 ? text.substring(0, splitIdx).trim() : text.trim();
   const infoBlock = splitIdx >= 0 ? text.substring(splitIdx) : "";
-
-  // 只抓「姓名：XXX」冒號後面有實際內容的，空的不算
-  const nameMatch = infoBlock.match(/姓名[：:]\s*(\S[^\n]*)/);
-  const phoneMatch = infoBlock.match(/電話[：:]\s*(\S[^\n]*)/);
-  const addrMatch = infoBlock.match(/地址[：:]\s*(\S[^\n]*)/);
-
+  // 冒號後面必須有非空白字元才算有填
+  const nameM = infoBlock.match(/姓名[：:]\s*(\S[^\r\n]*)/u);
+  const phoneM = infoBlock.match(/電話[：:]\s*(\S[^\r\n]*)/u);
+  const addrM = infoBlock.match(/地址[：:]\s*(\S[^\r\n]*)/u);
   return {
-    itemText,
-    nameFromDesc: nameMatch ? nameMatch[1].trim() : "",
-    phoneFromDesc: phoneMatch ? phoneMatch[1].trim() : "",
-    addrFromDesc: addrMatch ? addrMatch[1].trim() : ""
+    itemText: itemText,
+    nameFromDesc: nameM ? nameM[1].trim() : "",
+    phoneFromDesc: phoneM ? phoneM[1].trim() : "",
+    addrFromDesc: addrM ? addrM[1].trim() : ""
   };
 }
 
 function parseContactBlock(text) {
   if (!text) return { phone: "", name: "", addresses: [] };
-
-  const nameMatch = text.match(/姓名[：:]\s*(\S[^
-]*)/);
-  const phoneMatch = text.match(/電話[：:]\s*(\S[^
-]*)/);
-  const name = nameMatch ? nameMatch[1].trim() : "";
-  const phone = phoneMatch ? phoneMatch[1].trim() : "";
-
+  const nameM = text.match(/姓名[：:]\s*(\S[^\r\n]*)/u);
+  const phoneM = text.match(/電話[：:]\s*(\S[^\r\n]*)/u);
+  const name = nameM ? nameM[1].trim() : "";
+  const phone = phoneM ? phoneM[1].trim() : "";
   const addresses = [];
-  // Match zip+address patterns like 428台中市...號 (括號內為標籤)
   const re = /(\d{3,6}[^\n（(，,]{5,60}[號])\s*(?:[（(]([^)）\n]{2,20})[)）])?/g;
   let m;
   while ((m = re.exec(text)) !== null) {
     const addr = m[1].trim();
-    const label = m[2] ? m[2].trim() : `地址${addresses.length + 1}`;
-    if (addr && !addresses.find(r => r.address === addr)) {
-      addresses.push({ label, address: addr });
+    const label = m[2] ? m[2].trim() : "地址" + (addresses.length + 1);
+    if (addr && !addresses.find(function(r) { return r.address === addr; })) {
+      addresses.push({ label: label, address: addr });
     }
   }
-
-  // Fallback: line-by-line city detection
   if (addresses.length === 0) {
-    const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
+    const lines = text.split(/\n/).map(function(l) { return l.trim(); }).filter(Boolean);
     let cityLabel = "";
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       const cityMatch = line.match(/^(台北|台中|台南|高雄|嘉義|桃園|新竹|彰化|苗栗|花蓮|宜蘭|屏東|台東|基隆)[：:]/);
       if (cityMatch) cityLabel = cityMatch[1];
       const addrMatch = line.match(/\d{3,6}[^\n（(]{5,50}[號]/);
       if (addrMatch) {
         const bracketMatch = line.match(/[（(]([^)）]{2,20})[)）]/);
-        const label = bracketMatch ? bracketMatch[1] : (cityLabel || `地址${addresses.length + 1}`);
-        if (!addresses.find(r => r.address === addrMatch[0].trim())) {
-          addresses.push({ label, address: addrMatch[0].trim() });
+        const label = bracketMatch ? bracketMatch[1] : (cityLabel || "地址" + (addresses.length + 1));
+        if (!addresses.find(function(r) { return r.address === addrMatch[0].trim(); })) {
+          addresses.push({ label: label, address: addrMatch[0].trim() });
         }
       }
     }
   }
-
-  return { phone, name, addresses };
+  return { phone: phone, name: name, addresses: addresses };
 }
 
 function getTitle(page) {
-  const t = page.properties["任務"]?.title || [];
-  return t.map(x => x.plain_text).join("") || "（無標題）";
+  const t = (page.properties["任務"] && page.properties["任務"].title) || [];
+  return t.map(function(x) { return x.plain_text; }).join("") || "（無標題）";
 }
 
 function getDate(page, prop) {
-  return page.properties[prop]?.date?.start || "";
+  return (page.properties[prop] && page.properties[prop].date && page.properties[prop].date.start) || "";
 }
 
 function getRichText(page, prop) {
-  return (page.properties[prop]?.rich_text || []).map(x => x.plain_text).join("");
+  return ((page.properties[prop] && page.properties[prop].rich_text) || []).map(function(x) { return x.plain_text; }).join("");
 }
 
-function escHtml(str) {
-  return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function esc(str) {
+  return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-document.getElementById("search-input").addEventListener("keydown", e => {
+document.getElementById("search-input").addEventListener("keydown", function(e) {
   if (e.key === "Enter") searchTasks();
 });
 </script>

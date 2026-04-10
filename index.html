@@ -555,9 +555,10 @@ function parseDesc(text) {
   const itemText = splitIdx >= 0 ? text.substring(0, splitIdx).trim() : text.trim();
   const infoBlock = splitIdx >= 0 ? text.substring(splitIdx) : "";
 
-  const nameMatch = infoBlock.match(/姓名[：:]\s*(.+)/);
-  const phoneMatch = infoBlock.match(/電話[：:]\s*(.+)/);
-  const addrMatch = infoBlock.match(/地址[：:]\s*(.+)/);
+  // 只抓「姓名：XXX」冒號後面有實際內容的，空的不算
+  const nameMatch = infoBlock.match(/姓名[：:]\s*(\S[^\n]*)/);
+  const phoneMatch = infoBlock.match(/電話[：:]\s*(\S[^\n]*)/);
+  const addrMatch = infoBlock.match(/地址[：:]\s*(\S[^\n]*)/);
 
   return {
     itemText,

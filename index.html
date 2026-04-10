@@ -289,7 +289,7 @@ async function searchTasks() {
 
   try {
     const result = await notionAPI(`/databases/${TASKS_DB}/query`, "POST", {
-      filter: { property: "名稱", title: { contains: q } },
+      filter: { property: "任務", title: { contains: q } },
       sorts: [{ property: "完成期限", direction: "descending" }],
       page_size: 15
     });
@@ -607,7 +607,7 @@ function parseContactBlock(text) {
 }
 
 function getTitle(page) {
-  const t = page.properties["名稱"]?.title || [];
+  const t = page.properties["任務"]?.title || [];
   return t.map(x => x.plain_text).join("") || "（無標題）";
 }
 

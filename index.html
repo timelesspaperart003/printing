@@ -44,7 +44,7 @@
 <div class="app">
   <div class="header">
     <h1>出貨單列印工具</h1>
-    <p>雋永紙藝（紙紮百貨）</p>
+    <p id="today-date"></p>
   </div>
   <div id="view-search">
     <div class="card">
@@ -65,6 +65,7 @@
 </div>
 
 <script>
+document.getElementById("today-date").textContent = new Date().toLocaleDateString("zh-TW",{year:"numeric",month:"2-digit",day:"2-digit"});
 var GAS_URL = "https://script.google.com/macros/s/AKfycbx32ewy-B-1_dJ3NXlFgWI18U6cFFUJh5ILDNtmLDImuzWNg-rSJIYEcMmVTz4Yt8a-Jw/exec";
 var currentTask = null;
 var currentAddresses = [];
@@ -118,6 +119,28 @@ async function loadDetail(pageId) {
   }
 }
 
+function cleanItemText(text) {
+  if (!text) return "";
+  var lines = text.split("\n");
+  var result = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var cutIdx = -1;
+    var patterns = ["V", "v", "已備好"];
+    for (var p = 0; p < patterns.length; p++) {
+      var idx = line.indexOf(patterns[p]);
+      if (idx >= 0 && (cutIdx < 0 || idx < cutIdx)) cutIdx = idx;
+    }
+    if (cutIdx >= 0) {
+      var trimmed = line.substring(0, cutIdx).trim();
+      if (trimmed) result.push(trimmed);
+    } else {
+      result.push(line);
+    }
+  }
+  return result.join("\n").trim();
+}
+
 function renderDetail(detail) {
   var detailEl = document.getElementById("detail-content");
   var isPickup = detail.contactNotionName && detail.contactNotionName.indexOf("自取") >= 0;
@@ -127,6 +150,7 @@ function renderDetail(detail) {
   var sheetPhone = customers.length > 0 ? customers[0].phone : "";
   var finalName = detail.nameFromDesc || sheetName;
   var finalPhone = detail.phoneFromDesc || sheetPhone;
+  var cleanedItemText = cleanItemText(detail.itemText);
 
   var addrOptions = "";
   if (detail.addrFromDesc) addrOptions += '<option value="desc">' + esc(detail.addrFromDesc) + '</option>';
@@ -135,10 +159,12 @@ function renderDetail(detail) {
   });
   if (!addrOptions) addrOptions = '<option value="">（無地址資料）</option>';
 
-  currentTask = { title: detail.title, date: detail.date, itemText: detail.itemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
+  currentTask = { title: detail.title, date: detail.date, itemText: cleanedItemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
   currentAddresses = customers;
 
-  var contactFields = "";
+  var titleVal = esc(detail.title) + (isPickup ? "（自取）" : "");
+  var contactFields = '<div class="field"><div class="field-label">標題</div>'
+    + '<input type="text" id="field-title" value="' + titleVal + '" style="margin-top:5px;font-size:15px;font-weight:500;" /></div>';
   if (!isNanbanPickup) {
     contactFields = '<div class="field"><div class="field-label">收件姓名</div>'
       + '<input type="text" id="field-name" value="' + esc(finalName) + '" placeholder="收件姓名" style="margin-top:5px;" /></div>'
@@ -156,7 +182,7 @@ function renderDetail(detail) {
   detailEl.innerHTML = '<div class="task-title-display">' + esc(detail.title) + '</div>'
     + '<div class="task-meta">' + metaHtml + '</div>'
     + '<div class="field"><div class="field-label">商品內容（說明欄）</div>'
-    + '<div class="desc-box">' + esc(detail.itemText) + '</div></div>'
+    + '<div class="desc-box">' + esc(cleanedItemText) + '</div></div>'
     + contactFields
     + '<div class="divider"></div>'
     + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
@@ -178,6 +204,7 @@ function doPrint() {
   var finalPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
   var dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
 
+  var fieldTitle = document.getElementById("field-title") ? document.getElementById("field-title").value : currentTask.title;
   var contactRows = "";
   if (!currentTask.isNanbanPickup) {
     contactRows = "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td></tr>"
@@ -195,15 +222,15 @@ function doPrint() {
     + ".divider { border: none; border-top: 1.5px dashed #bbb; margin: 18px 0; }"
     + ".items-label { font-size: 10pt; color: #888; letter-spacing: 1px; margin-bottom: 6px; }"
     + ".items-content { font-size: 13pt; white-space: pre-wrap; line-height: 1.9; min-height: 60px; }"
-    + ".footer { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 8px; font-size: 10pt; color: #aaa; display: flex; justify-content: space-between; }"
+    
     + "@media print { body { padding: 12mm 16mm 10mm; } }";
 
   var printBody = "<div class='doc-title'>出 貨 單</div>"
-    + "<table class='info-table'><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr>" + contactRows + "</table>"
+    + "<table class='info-table'><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr><tr><td class='lbl'>標題：</td><td class='val' style='font-weight:500;font-size:14pt;'>" + esc(fieldTitle) + "</td></tr>" + contactRows + "</table>"
     + "<hr class='divider'>"
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(currentTask.itemText) + "</div>"
-    + "<div class='footer'><span>雋永紙藝（紙紮百貨）</span><span>artimelesss.com</span></div>";
+    ;
 
   var win = window.open("", "_blank", "width=800,height=700");
   win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>出貨單</title><style>" + printCSS + "</style></head><body>" + printBody + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");

@@ -247,7 +247,10 @@ function doPrint() {
     + ".items-label { font-size: 10pt; color: #888; letter-spacing: 1px; margin-bottom: 6px; }"
     + ".items-content { font-size: 13pt; white-space: pre-wrap; line-height: 1.9; min-height: 60px; }"
     
-    + "@media print { body { padding: 12mm 16mm 10mm; } @page :right { size: landscape; } }";
+    + "@media print { body { padding: 12mm 16mm 10mm; } }"
+    + "@media print { .page2 { page-break-before: always; } }"
+    + "@page page2 { size: A4 landscape; margin: 15mm; }"
+    + ".page2 { page: page2; padding: 15mm; }";
 
   var printBody = "<div class='doc-title'>出 貨 單　<span style='font-size:14pt;font-weight:400;letter-spacing:0;'>("+ esc(dateLabel) +")</span></div>"
     + "<table class='info-table'>"
@@ -258,14 +261,12 @@ function doPrint() {
     + "<hr class='divider'>"
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText) + "</div>"
-    + "<div style='page-break-before:always;'>"
-    + "<div style='transform:rotate(90deg);transform-origin:center center;width:297mm;height:210mm;position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;'>"
-    + "<table style='width:90%;border-collapse:collapse;font-size:18pt;'>"
+    + "<div class='page2'>"
+    + "<table style='width:100%;border-collapse:collapse;font-size:18pt;'>"
     + "<tr><td style='color:#444;white-space:nowrap;width:120px;font-weight:500;padding:8px 0;'>收件姓名：</td><td style='border-bottom:1px solid #ddd;padding:8px 4px;font-weight:500;font-size:20pt;'>" + esc(document.getElementById("field-name") ? document.getElementById("field-name").value : "") + "</td></tr>"
     + "<tr><td style='color:#444;white-space:nowrap;font-weight:500;padding:8px 0;'>電話：</td><td style='border-bottom:1px solid #ddd;padding:8px 4px;font-size:18pt;'>" + esc(document.getElementById("field-phone") ? document.getElementById("field-phone").value : "") + "</td></tr>"
     + "<tr><td style='color:#444;white-space:nowrap;font-weight:500;padding:8px 0;'>地址：</td><td style='border-bottom:1px solid #ddd;padding:8px 4px;font-size:16pt;'>" + esc(addrText) + "</td></tr>"
     + "</table>"
-    + "</div>"
     + "</div>"
     ;
 

@@ -185,7 +185,25 @@ function renderDetail(detail) {
     + '<textarea id="item-text" style="margin-top:5px;width:100%;min-height:120px;font-family:inherit;font-size:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;line-height:1.7;resize:vertical;outline:none;">' + esc(cleanedItemText) + '</textarea></div>'
     + contactFields
     + '<div class="divider"></div>'
+    + '<div class="field"><div class="field-label">出貨人員</div>'
+    + '<div id="staff-select" style="display:flex;gap:10px;margin-top:8px;">'
+    + '<label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;"><input type="checkbox" value="蓉" style="width:18px;height:18px;"> 蓉</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;"><input type="checkbox" value="尤" style="width:18px;height:18px;"> 尤</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;"><input type="checkbox" value="培" style="width:18px;height:18px;"> 培</label>'
+    + '</div></div>'
+    + '<div class="divider"></div>'
     + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
+}
+
+function countItems(text) {
+  var total = 0;
+  var matches = text.match(/\*(\d+)/g);
+  if (matches) {
+    matches.forEach(function(m) {
+      total += parseInt(m.replace("*",""));
+    });
+  }
+  return total;
 }
 
 function doPrint() {
@@ -205,6 +223,13 @@ function doPrint() {
   var dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
 
   var fieldTitle = document.getElementById("field-title") ? document.getElementById("field-title").value : currentTask.title;
+  var itemTextVal = document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText;
+  var totalCount = countItems(itemTextVal);
+  var staffChecked = [];
+  var staffBoxes = document.querySelectorAll('#staff-select input:checked');
+  staffBoxes.forEach(function(b){ staffChecked.push(b.value); });
+  var staffText = staffChecked.length > 0 ? staffChecked.join('、') : '';
+
   var contactRows = "";
   if (!currentTask.isNanbanPickup) {
     contactRows = "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td></tr>"
@@ -226,7 +251,7 @@ function doPrint() {
     + "@media print { body { padding: 12mm 16mm 10mm; } }";
 
   var printBody = "<div class='doc-title'>出 貨 單</div>"
-    + "<table class='info-table'><tr><td class='lbl'>標題：</td><td class='val' style='font-weight:500;font-size:14pt;'>" + esc(fieldTitle) + "</td></tr><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr>" + contactRows + "</table>"
+    + "<table class='info-table'><tr><td class='lbl'>標題：</td><td class='val' style='font-weight:500;font-size:14pt;'>" + esc(fieldTitle) + "</td></tr><tr><td class='lbl'>日期：</td><td class='val'>" + esc(dateLabel) + "</td></tr>" + contactRows + "<tr><td class='lbl'>共幾件：</td><td class='val'>" + totalCount + " 件</td></tr>" + "<tr><td class='lbl'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td></tr>" + "<tr><td class='lbl'>客戶簽收：</td><td class='val' style='height:60px;border-bottom:1px solid #ddd;'>&nbsp;</td></tr>" + "</table>"
     + "<hr class='divider'>"
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText) + "</div>"

@@ -299,8 +299,8 @@ function doPrint() {
     ".page1 { page: p1; width: 190mm; min-height: 267mm; }",
     ".page2 { page: p2; page-break-before: always; width: 277mm; min-height: 190mm; }",
     "html, body { -webkit-print-color-adjust: exact; }",
-    ".doc-title { font-size: 20pt; font-weight: 700; letter-spacing: 4px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }",
-    ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11pt; }",
+    ".doc-title { font-size: 32pt; font-weight: 700; letter-spacing: 4px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }",
+    ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 18pt; }",
     ".info-table td { padding: 5px 3px; vertical-align: top; }",
     ".info-table td.lbl { color: #444; white-space: nowrap; width: 22%; font-weight: 500; border-bottom: 1px solid #eee; }",
     ".info-table td.val { border-bottom: 1px solid #eee; width: 28%; }",
@@ -353,7 +353,7 @@ function doPrint() {
     + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;font-size:' + p2FontSize + 'pt;'>"
     + "<div class='post-corner' style='font-size:8pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
     + "<div>"
-    + "<div class='post-row' style='font-size:9pt;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
+    + "<div class='post-row' style='font-size:' + (0.9 * p2FontSize) + 'pt;><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
     + "<table class='zip-table' style='margin-left:3mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
     + "<div class='post-row' style='font-size:9pt;margin-top:1mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
     + "<div class='post-row' style='font-size:9pt;margin-top:1mm;'>姓名：<span class='post-line' style='min-width:40mm;'>雋永紙藝</span>"
@@ -365,9 +365,9 @@ function doPrint() {
     + "<div class='post-row' style='margin-top:2mm;align-items:flex-start;'>"
     + "<span class='recv-label' style='font-size:16pt;margin-right:4mm;'>收件人</span>"
     + "<div style='flex:1;'>"
-    + "<div class='post-row' style='font-size:10pt;margin-bottom:3mm;'>地址：<span class='post-line' style='flex:1;font-size:10pt;'>" + esc(recvAddrClean2) + "</span></div>"
+    + "<div class='post-row' style='font-size:10pt;margin-bottom:3mm;'>地址：<span class='post-line' style='flex:1;font-size:' + (1.0 * p2FontSize) + 'pt;>" + esc(recvAddrClean2) + "</span></div>"
     + "<div class='post-row' style='font-size:10pt;margin-bottom:3mm;'>姓名：<span class='post-line' style='flex:1;font-size:16pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
-    + "<div class='post-row' style='font-size:10pt;'>電話：<span class='post-line' style='flex:1;font-size:13pt;'>" + esc(recvPhone2) + "</span></div>"
+    + "<div class='post-row' style='font-size:' + (1.0 * p2FontSize) + 'pt;>電話：<span class='post-line' style='flex:1;font-size:' + (1.3 * p2FontSize) + 'pt;>" + esc(recvPhone2) + "</span></div>"
     + "</div></div>"
     + "</div>"
     + "<div class='post-divider'></div>"

@@ -196,6 +196,15 @@ function renderDetail(detail) {
     + '<label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;"><input type="checkbox" value="培" style="width:18px;height:18px;"> 培</label>'
     + '</div></div>'
     + '<div class="divider"></div>'
+    + '<div class="field">'
+    + '<div class="field-label">第一頁字體大小 <span id="p1-size-val">20</span>pt</div>'
+    + '<input type="range" id="p1-size" min="10" max="36" value="20" style="width:100%;margin-top:6px;" oninput="document.getElementById(\"p1-size-val\").textContent=this.value">'
+    + '</div>'
+    + '<div class="field">'
+    + '<div class="field-label">第二頁字體大小 <span id="p2-size-val">10</span>pt</div>'
+    + '<input type="range" id="p2-size" min="6" max="24" value="10" style="width:100%;margin-top:6px;" oninput="document.getElementById(\"p2-size-val\").textContent=this.value">'
+    + '</div>'
+    + '<div class="divider"></div>'
     + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
 }
 
@@ -297,7 +306,7 @@ function doPrint() {
     ".info-table td.val { border-bottom: 1px solid #eee; width: 28%; }",
     ".dashed { border: none; border-top: 1px dashed #bbb; margin: 12px 0; }",
     ".items-label { font-size: 9pt; color: #888; margin-bottom: 4px; }",
-    ".items-content { font-size: 20pt; white-space: pre-wrap; line-height: 1.7; font-weight: 500; }",
+    ".items-content { font-size: " + (document.getElementById("p1-size") ? document.getElementById("p1-size").value : "20") + "pt; white-space: pre-wrap; line-height: 1.7; font-weight: 500; }",
     ".post-wrap { width: 100%; height: 100%; border: 1px solid #ccc; padding: 8mm; position: relative; font-size: 10pt; box-sizing: border-box; }",
     ".post-row { display: flex; align-items: flex-end; margin-bottom: 4mm; gap: 3mm; }",
     ".post-line { border-bottom: 1px solid #999; display: inline-block; }",
@@ -339,8 +348,9 @@ function doPrint() {
     return boxes;
   }
 
+  var p2FontSize = document.getElementById('p2-size') ? document.getElementById('p2-size').value : '10';
   var page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
-    + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;font-size:10pt;'>"
+    + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;font-size:' + p2FontSize + 'pt;'>"
     + "<div class='post-corner' style='font-size:8pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
     + "<div>"
     + "<div class='post-row' style='font-size:9pt;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"

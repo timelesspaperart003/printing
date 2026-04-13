@@ -232,7 +232,7 @@ function doPrint() {
 
   var contactRows = "";
   if (!currentTask.isNanbanPickup) {
-    contactRows = "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td><td class='lbl' style='padding-left:12px;'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
+    contactRows = "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td><td class='lbl' style='width:22%;padding-left:12px;'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
       + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>";
   }
 
@@ -241,29 +241,31 @@ function doPrint() {
     + ".doc-title { font-size: 22pt; font-weight: 700; letter-spacing: 6px; border-bottom: 2.5px solid #111; padding-bottom: 10px; margin-bottom: 22px; }"
     + ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13pt; }"
     + ".info-table td { padding: 6px 0; vertical-align: top; }"
-    + ".info-table td.lbl { color: #444; white-space: nowrap; width: 80px; font-weight: 500; }"
+    + ".info-table td.lbl { color: #444; white-space: nowrap; width: 22%; font-weight: 500; }"
     + ".info-table td.val { border-bottom: 1px solid #ddd; padding-bottom: 6px; padding-left: 4px; }"
     + ".divider { border: none; border-top: 1.5px dashed #bbb; margin: 18px 0; }"
     + ".items-label { font-size: 10pt; color: #888; letter-spacing: 1px; margin-bottom: 6px; }"
     + ".items-content { font-size: 13pt; white-space: pre-wrap; line-height: 1.9; min-height: 60px; }"
     
-    + "@media print { body { padding: 12mm 16mm 10mm; } }";
+    + "@media print { body { padding: 12mm 16mm 10mm; } @page :right { size: landscape; } }";
 
   var printBody = "<div class='doc-title'>出 貨 單　<span style='font-size:14pt;font-weight:400;letter-spacing:0;'>("+ esc(dateLabel) +")</span></div>"
     + "<table class='info-table'>"
-    + "<tr><td class='lbl'>標題：</td><td class='val' style='font-weight:500;font-size:13pt;'>" + esc(fieldTitle) + "</td><td class='lbl' style='width:80px;padding-left:12px;'>商品數：</td><td class='val' style='width:60px;'>" + totalCount + " 件</td></tr>"
+    + "<tr><td class='lbl'>標題：</td><td class='val' style='font-weight:500;font-size:13pt;'>" + esc(fieldTitle) + "</td><td class='lbl' style='width:22%;padding-left:12px;'>商品數：</td><td class='val' style='width:28%;'>" + totalCount + " 件</td></tr>"
     + contactRows
-    + "<tr><td class='lbl'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td><td class='lbl' style='padding-left:12px;'>客戶簽收：</td><td class='val'>&nbsp;</td></tr>"
+    + "<tr><td class='lbl'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td><td class='lbl' style='width:22%;padding-left:12px;'>客戶簽收：</td><td class='val'>&nbsp;</td></tr>"
     + "</table>"
     + "<hr class='divider'>"
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText) + "</div>"
-    + "<div style='page-break-before:always;padding-top:20mm;'>"
-    + "<table class='info-table' style='font-size:16pt;'>"
-    + "<tr><td class='lbl' style='width:100px;'>收件姓名：</td><td class='val' style='font-size:16pt;font-weight:500;'>" + esc(document.getElementById("field-name") ? document.getElementById("field-name").value : "") + "</td></tr>"
-    + "<tr><td class='lbl'>電話：</td><td class='val' style='font-size:16pt;'>" + esc(document.getElementById("field-phone") ? document.getElementById("field-phone").value : "") + "</td></tr>"
-    + "<tr><td class='lbl'>地址：</td><td class='val' style='font-size:14pt;'>" + esc(addrText) + "</td></tr>"
+    + "<div style='page-break-before:always;'>"
+    + "<div style='transform:rotate(90deg);transform-origin:center center;width:297mm;height:210mm;position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;'>"
+    + "<table style='width:90%;border-collapse:collapse;font-size:18pt;'>"
+    + "<tr><td style='color:#444;white-space:nowrap;width:120px;font-weight:500;padding:8px 0;'>收件姓名：</td><td style='border-bottom:1px solid #ddd;padding:8px 4px;font-weight:500;font-size:20pt;'>" + esc(document.getElementById("field-name") ? document.getElementById("field-name").value : "") + "</td></tr>"
+    + "<tr><td style='color:#444;white-space:nowrap;font-weight:500;padding:8px 0;'>電話：</td><td style='border-bottom:1px solid #ddd;padding:8px 4px;font-size:18pt;'>" + esc(document.getElementById("field-phone") ? document.getElementById("field-phone").value : "") + "</td></tr>"
+    + "<tr><td style='color:#444;white-space:nowrap;font-weight:500;padding:8px 0;'>地址：</td><td style='border-bottom:1px solid #ddd;padding:8px 4px;font-size:16pt;'>" + esc(addrText) + "</td></tr>"
     + "</table>"
+    + "</div>"
     + "</div>"
     ;
 

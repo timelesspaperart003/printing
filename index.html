@@ -261,13 +261,10 @@ function doPrint() {
     + "<hr class='divider'>"
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText) + "</div>"
-    + "<div class='page2' style='display:flex;flex-direction:column;justify-content:center;align-items:center;height:180mm;text-align:center;'>"
-    + "<p style='font-size:16pt;font-weight:500;margin-bottom:2mm;'>收件姓名：</p>"
-    + "<p style='font-size:28pt;font-weight:700;margin-bottom:10mm;word-break:break-all;max-width:240mm;'>" + esc(document.getElementById("field-name") ? document.getElementById("field-name").value : "") + "</p>"
-    + "<p style='font-size:16pt;font-weight:500;margin-bottom:2mm;'>電話：</p>"
-    + "<p style='font-size:24pt;margin-bottom:10mm;'>" + esc(document.getElementById("field-phone") ? document.getElementById("field-phone").value : "") + "</p>"
-    + "<p style='font-size:16pt;font-weight:500;margin-bottom:2mm;'>地址：</p>"
-    + "<p style='font-size:20pt;word-break:break-all;max-width:240mm;'>" + esc(addrText) + "</p>"
+    + "<div class='page2' style='display:flex;flex-direction:column;justify-content:center;align-items:flex-start;height:180mm;padding:0 10mm;'>"
+    + "<p style='font-size:26pt;font-weight:700;margin-bottom:10mm;word-break:break-all;'><span style='font-size:16pt;font-weight:500;color:#444;'>收件姓名：</span>" + esc(document.getElementById("field-name") ? document.getElementById("field-name").value : "") + "</p>"
+    + "<p style='font-size:24pt;margin-bottom:10mm;'><span style='font-size:16pt;font-weight:500;color:#444;'>電話：</span>" + esc(document.getElementById("field-phone") ? document.getElementById("field-phone").value : "") + "</p>"
+    + "<p style='font-size:20pt;word-break:break-all;'><span style='font-size:16pt;font-weight:500;color:#444;'>地址：</span>" + esc(addrText) + "</p>"
     + "</div>"
     ;
 

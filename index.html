@@ -282,74 +282,88 @@ function doPrint() {
       + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>";
   }
 
-  var printCSS = "* { box-sizing: border-box; margin: 0; padding: 0; }"
-    + "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; padding: 24mm 22mm 20mm; font-size: 13pt; line-height: 1.8; }"
-    + ".doc-title { font-size: 22pt; font-weight: 700; letter-spacing: 6px; border-bottom: 2.5px solid #111; padding-bottom: 10px; margin-bottom: 22px; }"
-    + ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13pt; }"
-    + ".info-table td { padding: 6px 0; vertical-align: top; }"
-    + ".info-table td.lbl { color: #444; white-space: nowrap; width: 22%; font-weight: 500; }"
-    + ".info-table td.val { border-bottom: 1px solid #ddd; padding-bottom: 6px; padding-left: 4px; }"
-    + ".divider { border: none; border-top: 1.5px dashed #bbb; margin: 18px 0; }"
-    + ".items-label { font-size: 10pt; color: #888; letter-spacing: 1px; margin-bottom: 6px; }"
-    + ".items-content { font-size: 22pt; white-space: pre-wrap; line-height: 1.8; word-break: break-word; font-weight: 500; }"
-    
-    + "@media print { body { padding: 12mm 16mm 10mm; } }"
-    + "@media print { .page2 { page-break-before: always; } }"
-    + "@page page2 { size: A4 landscape; margin: 15mm; }"
-    + ".page2 { page: page2; padding: 15mm; }";
+  var printCSS = [
+    "* { box-sizing: border-box; margin: 0; padding: 0; }",
+    "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; }",
+    "@page p1 { size: A4 portrait; margin: 12mm 16mm; }",
+    "@page p2 { size: A4 landscape; margin: 10mm; }",
+    ".page1 { page: p1; }",
+    ".page2 { page: p2; page-break-before: always; }",
+    ".doc-title { font-size: 20pt; font-weight: 700; letter-spacing: 4px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }",
+    ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11pt; }",
+    ".info-table td { padding: 5px 3px; vertical-align: top; }",
+    ".info-table td.lbl { color: #444; white-space: nowrap; width: 22%; font-weight: 500; border-bottom: 1px solid #eee; }",
+    ".info-table td.val { border-bottom: 1px solid #eee; width: 28%; }",
+    ".dashed { border: none; border-top: 1px dashed #bbb; margin: 12px 0; }",
+    ".items-label { font-size: 9pt; color: #888; margin-bottom: 4px; }",
+    ".items-content { font-size: 20pt; white-space: pre-wrap; line-height: 1.8; font-weight: 500; }",
+    ".post-wrap { width: 100%; max-width: 240mm; margin: 20mm auto; border: 1px solid #ccc; padding: 8mm; position: relative; font-size: 10pt; }",
+    ".post-row { display: flex; align-items: flex-end; margin-bottom: 4mm; gap: 3mm; }",
+    ".post-line { border-bottom: 1px solid #999; display: inline-block; }",
+    ".zip-table { border-collapse: collapse; display: inline-table; }",
+    ".zip-table td { border: 1px solid #333; width: 20px; height: 24px; text-align: center; font-size: 12pt; }",
+    ".zip-sep { border: none !important; padding: 0 2px; font-size: 12pt; }",
+    ".post-divider { border-top: 2px dashed #c00; margin: 4mm 0; }",
+    ".recv-label { color: #c00; font-weight: 700; font-size: 13pt; writing-mode: vertical-rl; margin-right: 4mm; }",
+    ".post-corner { position: absolute; top: 6mm; right: 6mm; font-size: 8pt; text-align: right; line-height: 1.6; }"
+  ].join(" ");
 
-  var printBody = "<div class='doc-title'>出 貨 單　<span style='font-size:14pt;font-weight:400;letter-spacing:0;'>("+ esc(dateLabel) +")</span></div>"
+  var page1HTML = "<div class='page1'>"
+    + "<div class='doc-title'>出 貨 單　<span style='font-size:13pt;font-weight:400;letter-spacing:0;'>(" + esc(dateLabel) + ")</span></div>"
     + "<table class='info-table'>"
-    + "<tr><td class='lbl'>標題：</td><td class='val' style='font-weight:500;font-size:13pt;'>" + esc(fieldTitle) + "</td><td class='lbl' style='width:22%;padding-left:12px;'>商品數：</td><td class='val' style='width:28%;'>" + totalCount + " 件</td></tr>"
-    + contactRows
-    + "<tr><td class='lbl'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td><td class='lbl' style='width:22%;padding-left:12px;'>客戶簽收：</td><td class='val'>&nbsp;</td></tr>"
+    + "<tr><td class='lbl'>標題：</td><td class='val' style='font-weight:600;font-size:12pt;' colspan='3'>" + esc(fieldTitle) + "</td></tr>"
+    + "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td><td class='lbl' style='padding-left:6px;'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
+    + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>"
+    + (currentTask.isNanbanPickup ? "" : "")
+    + "<tr><td class='lbl'>商品數：</td><td class='val'>" + totalCount + " 件</td><td class='lbl' style='padding-left:6px;'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td></tr>"
+    + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val' colspan='3'></td></tr>"
     + "</table>"
-    + "<hr class='divider'>"
+    + "<hr class='dashed'>"
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText) + "</div>"
-    + (function(){
-      var recvName = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
-      var recvPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
-      var recvAddr = addrText;
-      // 自動抓郵遞區號（地址開頭的3-6位數字）
-      var recvZip = lookupZip(recvAddr);
-      var recvAddrClean = recvAddr.replace(/^\d{3,6}/, "").trim();
-      // 郵遞區號格子（3格）
-      function zipBoxes(zip, count) {
-        var boxes = "";
-        for (var i = 0; i < count; i++) {
-          boxes += "<td style='border:1px solid #333;width:22px;height:26px;text-align:center;font-size:13pt;'>" + (zip[i]||"") + "</td>";
-        }
-        return boxes;
-      }
-      var senderZip = "717";
-      var postCSS = "body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;margin:0;padding:8mm;font-size:10pt;display:flex;justify-content:center;align-items:center;min-height:90vh;} .post-wrap{border:1px solid #ccc;padding:6mm;width:180mm;position:relative;} .section{margin-bottom:5mm;} .label{color:#c00;font-weight:700;font-size:9pt;} .line{border-bottom:1px solid #999;display:inline-block;min-width:80mm;} .zip-table{border-collapse:collapse;display:inline-table;margin-left:3mm;} .row{display:flex;align-items:flex-end;margin-bottom:3mm;gap:4mm;} .divider{border-top:2px dashed #c00;margin:5mm 0;}";
-      var html = "<div class='post-wrap'>";
-      // 右上角特約戶編號
-      html += "<div style='position:absolute;top:6mm;right:6mm;font-size:9pt;text-align:right;'>特約戶編號：<br>704009001383</div>";
-      // 寄件人
-      html += "<div class='section'>";
-      html += "<div class='row'><span class='label'>（寄件人）</span><table class='zip-table'><tr>" + zipBoxes(senderZip,3) + "<td style='border:none;padding:0 3px;'>-</td>" + zipBoxes("",2) + "</tr></table></div>";
-      html += "<div class='row'>地址：<span class='line'>台南市仁德區太子五街22巷1號</span></div>";
-      html += "<div class='row'>姓名：<span class='line'>雋永紙藝</span></div>";
-      html += "<div class='row'>電話：<span class='line'>0961-561-234 / 062-052-140</span></div>";
-      html += "</div>";
-      html += "<div class='divider'></div>";
-      // 收件人
-      html += "<div class='section'>";
-      html += "<div class='row'><table class='zip-table'><tr>" + zipBoxes(recvZip,3) + "<td style='border:none;padding:0 3px;'>-</td>" + zipBoxes(recvZip.length>3?recvZip.slice(3):"",2) + "</tr></table></div>";
-      html += "<div class='row' style='margin-top:3mm;'><span style='color:#c00;font-weight:700;font-size:14pt;writing-mode:vertical-rl;margin-right:3mm;'>收件人</span><div><div class='row'>地址：<span class='line' style='min-width:100mm;font-size:12pt;'>" + esc(recvAddrClean) + "</span></div><div class='row' style='margin-top:3mm;'>姓名：<span class='line' style='font-size:13pt;font-weight:700;'>" + esc(recvName) + "</span></div><div class='row' style='margin-top:3mm;'>電話：<span class='line' style='font-size:12pt;'>" + esc(recvPhone) + "</span></div></div></div>";
-      html += "</div>";
-      html += "<div class='divider'></div>";
-      // 底部資訊
-      html += "<div style='font-size:9pt;color:#555;'>";
-      html += "<div>內容物：紙藝品</div>";
-      html += "<div style='margin-top:2mm;'>無法投遞處理方式：退回寄件人</div>";
-      html += "</div>";
-      html += "</div>";
-      return "<div class='page2' style='padding:0;'><style>" + postCSS + "</style>" + html + "</div>";
-    })()
-    ;
+    + "</div>";
+
+  var recvName2 = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
+  var recvPhone2 = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
+  var recvAddr2 = addrText;
+  var recvZip2 = lookupZip(recvAddr2);
+  var recvAddrClean2 = recvAddr2.replace(/^\d{3,6}/, "").trim();
+  var senderZip2 = "717";
+
+  function zipBoxes2(zip, count) {
+    var boxes = "";
+    for (var i = 0; i < count; i++) {
+      boxes += "<td>" + (zip[i]||"") + "</td>";
+    }
+    return boxes;
+  }
+
+  var page2HTML = "<div class='page2'>"
+    + "<div class='post-wrap'>"
+    + "<div class='post-corner'>特約戶編號：<br>704009001383</div>"
+    + "<div class='post-row'><span style='color:#c00;font-weight:700;font-size:9pt;'>（寄件人）</span>"
+    + "<table class='zip-table'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
+    + "<div class='post-row'>地址：<span class='post-line' style='min-width:100mm;'>台南市仁德區太子五街22巷1號</span></div>"
+    + "<div class='post-row'>姓名：<span class='post-line' style='min-width:50mm;'>雋永紙藝</span></div>"
+    + "<div class='post-row'>電話：<span class='post-line' style='min-width:80mm;'>0961-561-234 / 062-052-140</span></div>"
+    + "<div class='post-divider'></div>"
+    + "<div class='post-row'><table class='zip-table'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
+    + "<div class='post-row' style='margin-top:4mm;align-items:flex-start;'>"
+    + "<span class='recv-label'>收件人</span>"
+    + "<div style='flex:1;'>"
+    + "<div class='post-row'>地址：<span class='post-line' style='min-width:110mm;font-size:12pt;'>" + esc(recvAddrClean2) + "</span></div>"
+    + "<div class='post-row' style='margin-top:3mm;'>姓名：<span class='post-line' style='min-width:70mm;font-size:14pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
+    + "<div class='post-row' style='margin-top:3mm;'>電話：<span class='post-line' style='min-width:70mm;font-size:12pt;'>" + esc(recvPhone2) + "</span></div>"
+    + "</div></div>"
+    + "<div class='post-divider'></div>"
+    + "<div style='font-size:9pt;color:#555;line-height:1.8;'>"
+    + "<div>內容物：紙藝品</div>"
+    + "<div>無法投遞處理方式：退回寄件人</div>"
+    + "</div>"
+    + "</div>"
+    + "</div>";
+
+  var printBody = page1HTML + page2HTML;
 
   var win = window.open("", "_blank", "width=800,height=700");
   win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>出貨單</title><style>" + printCSS + "</style></head><body>" + printBody + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");

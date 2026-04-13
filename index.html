@@ -245,7 +245,7 @@ function doPrint() {
     + ".info-table td.val { border-bottom: 1px solid #ddd; padding-bottom: 6px; padding-left: 4px; }"
     + ".divider { border: none; border-top: 1.5px dashed #bbb; margin: 18px 0; }"
     + ".items-label { font-size: 10pt; color: #888; letter-spacing: 1px; margin-bottom: 6px; }"
-    + ".items-content { font-size: 16pt; white-space: pre-wrap; line-height: 1.8; word-break: break-word; }"
+    + ".items-content { font-size: 22pt; white-space: pre-wrap; line-height: 1.8; word-break: break-word; font-weight: 500; }"
     
     + "@media print { body { padding: 12mm 16mm 10mm; } }"
     + "@media print { .page2 { page-break-before: always; } }"
@@ -262,8 +262,11 @@ function doPrint() {
     + "<div class='items-label'>商品內容</div>"
     + "<div class='items-content'>" + esc(document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText) + "</div>"
     + "<div class='page2' style='display:flex;flex-direction:column;justify-content:center;align-items:center;height:180mm;text-align:center;'>"
-    + "<p style='font-size:28pt;font-weight:700;margin-bottom:16mm;word-break:break-all;max-width:240mm;'>" + esc(document.getElementById("field-name") ? document.getElementById("field-name").value : "") + "</p>"
-    + "<p style='font-size:24pt;margin-bottom:16mm;'>" + esc(document.getElementById("field-phone") ? document.getElementById("field-phone").value : "") + "</p>"
+    + "<p style='font-size:16pt;font-weight:500;margin-bottom:2mm;'>收件姓名：</p>"
+    + "<p style='font-size:28pt;font-weight:700;margin-bottom:10mm;word-break:break-all;max-width:240mm;'>" + esc(document.getElementById("field-name") ? document.getElementById("field-name").value : "") + "</p>"
+    + "<p style='font-size:16pt;font-weight:500;margin-bottom:2mm;'>電話：</p>"
+    + "<p style='font-size:24pt;margin-bottom:10mm;'>" + esc(document.getElementById("field-phone") ? document.getElementById("field-phone").value : "") + "</p>"
+    + "<p style='font-size:16pt;font-weight:500;margin-bottom:2mm;'>地址：</p>"
     + "<p style='font-size:20pt;word-break:break-all;max-width:240mm;'>" + esc(addrText) + "</p>"
     + "</div>"
     ;

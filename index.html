@@ -287,8 +287,9 @@ function doPrint() {
     "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; }",
     "@page p1 { size: A4 portrait; margin: 10mm; }",
     "@page p2 { size: A4 landscape; margin: 10mm; }",
-    ".page1 { page: p1; }",
-    ".page2 { page: p2; page-break-before: always; }",
+    ".page1 { page: p1; width: 190mm; min-height: 267mm; }",
+    ".page2 { page: p2; page-break-before: always; width: 277mm; min-height: 190mm; }",
+    "html, body { -webkit-print-color-adjust: exact; }",
     ".doc-title { font-size: 20pt; font-weight: 700; letter-spacing: 4px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }",
     ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11pt; }",
     ".info-table td { padding: 5px 3px; vertical-align: top; }",
@@ -296,8 +297,8 @@ function doPrint() {
     ".info-table td.val { border-bottom: 1px solid #eee; width: 28%; }",
     ".dashed { border: none; border-top: 1px dashed #bbb; margin: 12px 0; }",
     ".items-label { font-size: 9pt; color: #888; margin-bottom: 4px; }",
-    ".items-content { font-size: 20pt; white-space: pre-wrap; line-height: 1.8; font-weight: 500; }",
-    ".post-wrap { width: 100%; height: 100%; border: 1px solid #ccc; padding: 8mm; position: relative; font-size: 27pt; box-sizing: border-box; }",
+    ".items-content { font-size: 20pt; white-space: pre-wrap; line-height: 1.7; font-weight: 500; }",
+    ".post-wrap { width: 100%; height: 100%; border: 1px solid #ccc; padding: 8mm; position: relative; font-size: 10pt; box-sizing: border-box; }",
     ".post-row { display: flex; align-items: flex-end; margin-bottom: 4mm; gap: 3mm; }",
     ".post-line { border-bottom: 1px solid #999; display: inline-block; }",
     ".zip-table { border-collapse: collapse; display: inline-table; }",
@@ -340,30 +341,27 @@ function doPrint() {
 
   var page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
     + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;'>"
-    + "<div class='post-corner' style='font-size:27pt;'>特約戶編號：<br>704009001383</div>"
-    // 寄件人區塊
+    + "<div class='post-corner' style='font-size:7pt;'>特約戶編號：<br>704009001383</div>"
     + "<div>"
-    + "<div class='post-row'><span style='color:#c00;font-weight:700;font-size:36pt;'>（寄件人）</span>"
-    + "<table class='zip-table' style='margin-left:4mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
-    + "<div class='post-row' style='font-size:36pt;margin-top:3mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
-    + "<div class='post-row' style='font-size:36pt;margin-top:3mm;'>姓名：<span class='post-line' style='min-width:60mm;'>雋永紙藝</span>"
-    + "<span style='margin-left:8mm;font-size:36pt;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
+    + "<div class='post-row'><span style='color:#c00;font-weight:700;font-size:7pt;'>（寄件人）</span>"
+    + "<table class='zip-table' style='margin-left:4mm;transform:scale(0.9);transform-origin:left center;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
+    + "<div class='post-row' style='font-size:7pt;margin-top:2mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
+    + "<div class='post-row' style='font-size:7pt;margin-top:2mm;'>姓名：<span class='post-line' style='min-width:55mm;'>雋永紙藝</span>"
+    + "<span style='margin-left:6mm;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
     + "</div>"
     + "<div class='post-divider'></div>"
-    // 收件人區塊
     + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"
-    + "<div class='post-row'><table class='zip-table' style='transform:scale(3.5);transform-origin:left center;margin:6mm 0 14mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
-    + "<div class='post-row' style='margin-top:4mm;align-items:flex-start;'>"
-    + "<span class='recv-label' style='font-size:65pt;margin-right:6mm;'>收件人</span>"
+    + "<div class='post-row'><table class='zip-table' style='transform:scale(1.0);transform-origin:left center;margin:3mm 0 8mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
+    + "<div class='post-row' style='margin-top:3mm;align-items:flex-start;'>"
+    + "<span class='recv-label' style='font-size:12pt;margin-right:5mm;'>收件人</span>"
     + "<div style='flex:1;'>"
-    + "<div class='post-row' style='font-size:40pt;margin-bottom:5mm;'>地址：<span class='post-line' style='flex:1;font-size:40pt;'>" + esc(recvAddrClean2) + "</span></div>"
-    + "<div class='post-row' style='font-size:40pt;margin-bottom:5mm;'>姓名：<span class='post-line' style='flex:1;font-size:59pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
-    + "<div class='post-row' style='font-size:40pt;'>電話：<span class='post-line' style='flex:1;font-size:54pt;'>" + esc(recvPhone2) + "</span></div>"
+    + "<div class='post-row' style='font-size:8pt;margin-bottom:4mm;'>地址：<span class='post-line' style='flex:1;'>" + esc(recvAddrClean2) + "</span></div>"
+    + "<div class='post-row' style='font-size:8pt;margin-bottom:4mm;'>姓名：<span class='post-line' style='flex:1;font-size:12pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
+    + "<div class='post-row' style='font-size:8pt;'>電話：<span class='post-line' style='flex:1;font-size:10pt;'>" + esc(recvPhone2) + "</span></div>"
     + "</div></div>"
     + "</div>"
     + "<div class='post-divider'></div>"
-    // 底部
-    + "<div style='font-size:29pt;color:#555;line-height:1.8;'>"
+    + "<div style='font-size:7pt;color:#555;line-height:1.8;'>"
     + "<div>內容物：紙藝品　　無法投遞處理方式：退回寄件人</div>"
     + "</div>"
     + "</div>"
@@ -374,398 +372,7 @@ function doPrint() {
   var win = window.open("", "_blank", "width=800,height=700");
   win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>出貨單</title><style>" + printCSS + "</style></head><body>" + printBody + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");
   win.document.close();
-}
 
-function backToSearch() {
-  document.getElementById("view-search").style.display = "block";
-  document.getElementById("view-detail").style.display = "none";
-}
-
-function esc(str) {
-  return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
-document.getElementById("search-input").addEventListener("keydown", function(e) {
-  if (e.key === "Enter") searchTasks();
-});
-</script>
-</body>
-</html><!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>出貨單列印工具｜雋永紙藝</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #f7f5f2; --surface: #ffffff; --border: #e0dbd4; --border-strong: #c8c2ba;
-    --text: #1a1814; --text-muted: #7a7570; --accent: #2d2926; --accent-light: #f0ede8;
-    --danger: #c0392b; --radius: 10px; --radius-sm: 6px; --shadow: 0 1px 4px rgba(0,0,0,0.08);
-  }
-  body { font-family: "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem 4rem; }
-  .app { width: 100%; max-width: 560px; }
-  .header { margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
-  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: 1px; }
-  .header p { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 1rem; }
-  .search-row { display: flex; gap: 8px; }
-  input[type="text"], select { font-family: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; outline: none; transition: border-color 0.15s; width: 100%; -webkit-appearance: none; }
-  input[type="text"]:focus, select:focus { border-color: var(--accent); }
-  button { font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer; border-radius: var(--radius-sm); padding: 10px 18px; transition: background 0.15s; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); white-space: nowrap; -webkit-tap-highlight-color: transparent; }
-  button:active { opacity: 0.7; }
-  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); width: 100%; padding: 13px; font-size: 16px; letter-spacing: 1px; }
-  button.ghost { background: none; border: none; color: var(--text-muted); padding: 0 0 1.25rem 0; font-size: 14px; }
-  .status { font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0 4px; }
-  .status.error { color: var(--danger); }
-  .task-item { padding: 13px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 6px; background: var(--surface); }
-  .task-item:active { background: var(--accent-light); }
-  .task-item-title { font-size: 15px; font-weight: 500; }
-  .task-item-date { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-  .field-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
-  .field { margin-bottom: 1rem; }
-  .task-title-display { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
-  .task-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
-  .desc-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; max-height: 180px; overflow-y: auto; }
-  .divider { height: 1px; background: var(--border); margin: 1rem 0; }
-  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
-</head>
-<body>
-<div class="app">
-  <div class="header">
-    <h1>出貨單列印工具</h1>
-    <p id="today-date"></p>
-  </div>
-  <div id="view-search">
-    <div class="card">
-      <div class="search-row">
-        <input type="text" id="search-input" placeholder="輸入任務名稱關鍵字..." />
-        <button onclick="searchTasks()">搜尋</button>
-      </div>
-      <div id="search-status" class="status">輸入關鍵字後按搜尋</div>
-    </div>
-    <div id="tasks-list"></div>
-  </div>
-  <div id="view-detail" style="display:none;">
-    <button class="ghost" onclick="backToSearch()">← 返回搜尋</button>
-    <div class="card" id="detail-content">
-      <div class="status"><span class="spinner"></span>載入中...</div>
-    </div>
-  </div>
-</div>
-
-<script>
-document.getElementById("today-date").textContent = new Date().toLocaleDateString("zh-TW",{year:"numeric",month:"2-digit",day:"2-digit"});
-var GAS_URL = "https://script.google.com/macros/s/AKfycbx32ewy-B-1_dJ3NXlFgWI18U6cFFUJh5ILDNtmLDImuzWNg-rSJIYEcMmVTz4Yt8a-Jw/exec";
-var currentTask = null;
-var currentAddresses = [];
-
-async function gasAPI(params) {
-  var url = GAS_URL + "?" + Object.keys(params).map(function(k) {
-    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
-  }).join("&");
-  var res = await fetch(url);
-  return await res.json();
-}
-
-async function searchTasks() {
-  var q = document.getElementById("search-input").value.trim();
-  var statusEl = document.getElementById("search-status");
-  var listEl = document.getElementById("tasks-list");
-  if (!q) { statusEl.textContent = "請輸入搜尋關鍵字"; return; }
-  statusEl.innerHTML = '<span class="spinner"></span>搜尋中...';
-  statusEl.className = "status";
-  listEl.innerHTML = "";
-  try {
-    var results = await gasAPI({ action: "search", q: q });
-    if (results.error) throw new Error(results.error);
-    if (!results.length) { statusEl.textContent = "找不到符合的任務"; return; }
-    statusEl.textContent = "找到 " + results.length + " 筆";
-    results.forEach(function(task) {
-      var div = document.createElement("div");
-      div.className = "task-item";
-      div.innerHTML = '<div class="task-item-title">' + esc(task.title) + '</div>'
-        + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
-      div.onclick = function() { loadDetail(task.id); };
-      listEl.appendChild(div);
-    });
-  } catch(e) {
-    statusEl.textContent = "搜尋失敗：" + e.message;
-    statusEl.className = "status error";
-  }
-}
-
-async function loadDetail(pageId) {
-  document.getElementById("view-search").style.display = "none";
-  document.getElementById("view-detail").style.display = "block";
-  var detailEl = document.getElementById("detail-content");
-  detailEl.innerHTML = '<div class="status"><span class="spinner"></span>載入中...</div>';
-  try {
-    var detail = await gasAPI({ action: "detail", pageId: pageId });
-    if (detail.error) throw new Error(detail.error);
-    renderDetail(detail);
-  } catch(e) {
-    detailEl.innerHTML = '<div class="status error">載入失敗：' + e.message + '</div>';
-  }
-}
-
-function cleanItemText(text) {
-  if (!text) return "";
-  var lines = text.split("\n");
-  var result = [];
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    var cutIdx = -1;
-    // V/v 前後都有空格才算（例如 " V " 或 " v "）
-    var vMatch = line.match(/ [Vv] /);
-    if (vMatch) {
-      cutIdx = vMatch.index;
-    }
-    // 已備好 不需要空格限制
-    var prepIdx = line.indexOf("已備好");
-    if (prepIdx >= 0 && (cutIdx < 0 || prepIdx < cutIdx)) cutIdx = prepIdx;
-
-    if (cutIdx >= 0) {
-      var trimmed = line.substring(0, cutIdx).trim();
-      if (trimmed) result.push(trimmed);
-    } else {
-      result.push(line);
-    }
-  }
-  return result.join("\n").trim();
-}
-
-function renderDetail(detail) {
-  var detailEl = document.getElementById("detail-content");
-  var isPickup = (detail.contactNotionName && detail.contactNotionName.indexOf("自取") >= 0) || (detail.title && detail.title.indexOf("自取") >= 0);
-  var isNanbanPickup = detail.contactNotionName && detail.contactNotionName.indexOf("南灣") >= 0 && isPickup;
-  var customers = detail.customers || [];
-  var sheetName = customers.length > 0 ? customers[0].name : "";
-  var sheetPhone = customers.length > 0 ? customers[0].phone : "";
-  var finalName = detail.nameFromDesc || sheetName;
-  var finalPhone = detail.phoneFromDesc || sheetPhone;
-  var cleanedItemText = cleanItemText(detail.itemText);
-
-  var addrOptions = "";
-  if (detail.addrFromDesc) addrOptions += '<option value="desc">' + esc(detail.addrFromDesc) + '</option>';
-  customers.forEach(function(c, i) {
-    if (c.address) addrOptions += '<option value="' + i + '">' + esc(c.address) + '</option>';
-  });
-  if (!addrOptions) addrOptions = '<option value="">（無地址資料）</option>';
-
-  currentTask = { title: detail.title, date: detail.date, itemText: cleanedItemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
-  currentAddresses = customers;
-
-  var titleVal = esc(detail.title) + (isPickup ? "（自取）" : "");
-  var contactFields = '<div class="field"><div class="field-label">標題</div>'
-    + '<input type="text" id="field-title" value="' + titleVal + '" style="margin-top:5px;font-size:15px;font-weight:500;" /></div>';
-  if (!isNanbanPickup) {
-    contactFields = '<div class="field"><div class="field-label">收件姓名</div>'
-      + '<input type="text" id="field-name" value="' + esc(finalName) + '" placeholder="收件姓名" style="margin-top:5px;" /></div>'
-      + '<div class="field"><div class="field-label">電話</div>'
-      + '<input type="text" id="field-phone" value="' + esc(finalPhone) + '" placeholder="電話" style="margin-top:5px;" /></div>'
-      + '<div class="field"><div class="field-label">收件地址</div>'
-      + '<select id="addr-select" style="margin-top:5px;">' + addrOptions + '</select></div>';
-  }
-
-  var metaHtml = (detail.date ? "完成期限：" + detail.date : "未設定日期");
-  if (isPickup) metaHtml += '　｜　<strong>自取</strong>';
-  if (isNanbanPickup) metaHtml += ' <span style="color:var(--danger);font-size:12px;">（南灣自取，不印收件資料）</span>';
-  if (detail.contactNotionName) metaHtml += '　｜　客戶：' + esc(detail.contactNotionName);
-
-  detailEl.innerHTML = '<div class="task-title-display">' + esc(detail.title) + '</div>'
-    + '<div class="task-meta">' + metaHtml + '</div>'
-    + '<div class="field"><div class="field-label">商品內容（可編輯）</div>'
-    + '<textarea id="item-text" style="margin-top:5px;width:100%;min-height:120px;font-family:inherit;font-size:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;line-height:1.7;resize:vertical;outline:none;">' + esc(cleanedItemText) + '</textarea></div>'
-    + contactFields
-    + '<div class="divider"></div>'
-    + '<div class="field"><div class="field-label">出貨人員</div>'
-    + '<div id="staff-select" style="display:flex;gap:10px;margin-top:8px;">'
-    + '<label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;"><input type="checkbox" value="蓉" style="width:18px;height:18px;"> 蓉</label>'
-    + '<label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;"><input type="checkbox" value="尤" style="width:18px;height:18px;"> 尤</label>'
-    + '<label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;"><input type="checkbox" value="培" style="width:18px;height:18px;"> 培</label>'
-    + '</div></div>'
-    + '<div class="divider"></div>'
-    + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
-}
-
-var TW_ZIPCODES = {
-"基隆市仁愛區":"200","基隆市信義區":"201","基隆市中正區":"202","基隆市中山區":"203","基隆市安樂區":"204","基隆市暖暖區":"205","基隆市七堵區":"206",
-"臺北市中正區":"100","台北市中正區":"100","臺北市大同區":"103","台北市大同區":"103","臺北市中山區":"104","台北市中山區":"104","臺北市松山區":"105","台北市松山區":"105","臺北市大安區":"106","台北市大安區":"106","臺北市萬華區":"108","台北市萬華區":"108","臺北市信義區":"110","台北市信義區":"110","臺北市士林區":"111","台北市士林區":"111","臺北市北投區":"112","台北市北投區":"112","臺北市內湖區":"114","台北市內湖區":"114","臺北市南港區":"115","台北市南港區":"115","臺北市文山區":"116","台北市文山區":"116",
-"新北市萬里區":"207","新北市金山區":"208","新北市板橋區":"220","新北市汐止區":"221","新北市深坑區":"222","新北市石碇區":"223","新北市瑞芳區":"224","新北市平溪區":"226","新北市雙溪區":"227","新北市貢寮區":"228","新北市新店區":"231","新北市坪林區":"232","新北市烏來區":"233","新北市永和區":"234","新北市中和區":"235","新北市土城區":"236","新北市三峽區":"237","新北市樹林區":"238","新北市鶯歌區":"239","新北市三重區":"241","新北市新莊區":"242","新北市泰山區":"243","新北市林口區":"244","新北市蘆洲區":"247","新北市五股區":"248","新北市八里區":"249","新北市淡水區":"251","新北市三芝區":"252","新北市石門區":"253",
-"宜蘭縣宜蘭市":"260","宜蘭縣頭城鎮":"261","宜蘭縣礁溪鄉":"262","宜蘭縣壯圍鄉":"263","宜蘭縣員山鄉":"264","宜蘭縣羅東鎮":"265","宜蘭縣三星鄉":"266","宜蘭縣大同鄉":"267","宜蘭縣五結鄉":"268","宜蘭縣冬山鄉":"269","宜蘭縣蘇澳鎮":"270","宜蘭縣南澳鄉":"272","宜蘭縣釣魚台列嶼":"290",
-"桃園市中壢區":"320","桃園市平鎮區":"324","桃園市龍潭區":"325","桃園市楊梅區":"326","桃園市新屋區":"327","桃園市觀音區":"328","桃園市桃園區":"330","桃園市龜山區":"333","桃園市八德區":"334","桃園市大溪區":"335","桃園市復興區":"336","桃園市大園區":"337","桃園市蘆竹區":"338",
-"新竹市東區":"300","新竹市北區":"300","新竹市香山區":"300",
-"新竹縣竹北市":"302","新竹縣湖口鄉":"303","新竹縣新豐鄉":"304","新竹縣新埔鎮":"305","新竹縣關西鎮":"306","新竹縣芎林鄉":"307","新竹縣寶山鄉":"308","新竹縣竹東鎮":"310","新竹縣五峰鄉":"311","新竹縣橫山鄉":"312","新竹縣尖石鄉":"313","新竹縣北埔鄉":"314","新竹縣峨眉鄉":"315",
-"苗栗縣竹南鎮":"350","苗栗縣頭份市":"351","苗栗縣三灣鄉":"352","苗栗縣南庄鄉":"353","苗栗縣獅潭鄉":"354","苗栗縣後龍鎮":"356","苗栗縣通霄鎮":"357","苗栗縣苑裡鎮":"358","苗栗縣苗栗市":"360","苗栗縣造橋鄉":"361","苗栗縣頭屋鄉":"362","苗栗縣公館鄉":"363","苗栗縣大湖鄉":"364","苗栗縣泰安鄉":"365","苗栗縣銅鑼鄉":"366","苗栗縣三義鄉":"367","苗栗縣西湖鄉":"368","苗栗縣卓蘭鎮":"369",
-"臺中市中區":"400","台中市中區":"400","臺中市東區":"401","台中市東區":"401","臺中市南區":"402","台中市南區":"402","臺中市西區":"403","台中市西區":"403","臺中市北區":"404","台中市北區":"404","臺中市北屯區":"406","台中市北屯區":"406","臺中市西屯區":"407","台中市西屯區":"407","臺中市南屯區":"408","台中市南屯區":"408","臺中市太平區":"411","台中市太平區":"411","臺中市大里區":"412","台中市大里區":"412","臺中市霧峰區":"413","台中市霧峰區":"413","臺中市烏日區":"414","台中市烏日區":"414","臺中市豐原區":"420","台中市豐原區":"420","臺中市后里區":"421","台中市后里區":"421","臺中市石岡區":"422","台中市石岡區":"422","臺中市東勢區":"423","台中市東勢區":"423","臺中市和平區":"424","台中市和平區":"424","臺中市新社區":"426","台中市新社區":"426","臺中市潭子區":"427","台中市潭子區":"427","臺中市大雅區":"428","台中市大雅區":"428","臺中市神岡區":"429","台中市神岡區":"429","臺中市大肚區":"432","台中市大肚區":"432","臺中市沙鹿區":"433","台中市沙鹿區":"433","臺中市龍井區":"434","台中市龍井區":"434","臺中市梧棲區":"435","台中市梧棲區":"435","臺中市清水區":"436","台中市清水區":"436","臺中市大甲區":"437","台中市大甲區":"437","臺中市外埔區":"438","台中市外埔區":"438","臺中市大安區":"439","台中市大安區":"439",
-"彰化縣彰化市":"500","彰化縣芬園鄉":"502","彰化縣花壇鄉":"503","彰化縣秀水鄉":"504","彰化縣鹿港鎮":"505","彰化縣福興鄉":"506","彰化縣線西鄉":"507","彰化縣和美鎮":"508","彰化縣伸港鄉":"509","彰化縣員林市":"510","彰化縣社頭鄉":"511","彰化縣永靖鄉":"512","彰化縣埔心鄉":"513","彰化縣溪湖鎮":"514","彰化縣大村鄉":"515","彰化縣埔鹽鄉":"516","彰化縣田中鎮":"520","彰化縣北斗鎮":"521","彰化縣田尾鄉":"522","彰化縣埤頭鄉":"523","彰化縣溪州鄉":"524","彰化縣竹塘鄉":"525","彰化縣二林鎮":"526","彰化縣大城鄉":"527","彰化縣芳苑鄉":"528","彰化縣二水鄉":"530",
-"南投縣南投市":"540","南投縣中寮鄉":"541","南投縣草屯鎮":"542","南投縣國姓鄉":"544","南投縣埔里鎮":"545","南投縣仁愛鄉":"546","南投縣名間鄉":"551","南投縣集集鎮":"552","南投縣水里鄉":"553","南投縣魚池鄉":"555","南投縣信義鄉":"556","南投縣竹山鎮":"557","南投縣鹿谷鄉":"558",
-"雲林縣斗南鎮":"630","雲林縣大埤鄉":"631","雲林縣虎尾鎮":"632","雲林縣土庫鎮":"633","雲林縣褒忠鄉":"634","雲林縣東勢鄉":"635","雲林縣台西鄉":"636","雲林縣崙背鄉":"637","雲林縣麥寮鄉":"638","雲林縣斗六市":"640","雲林縣林內鄉":"643","雲林縣古坑鄉":"646","雲林縣莿桐鄉":"647","雲林縣西螺鎮":"648","雲林縣二崙鄉":"649","雲林縣北港鎮":"651","雲林縣水林鄉":"652","雲林縣口湖鄉":"653","雲林縣四湖鄉":"654","雲林縣元長鄉":"655",
-"嘉義市東區":"600","嘉義市西區":"600",
-"嘉義縣番路鄉":"602","嘉義縣梅山鄉":"603","嘉義縣竹崎鄉":"604","嘉義縣阿里山鄉":"605","嘉義縣中埔鄉":"606","嘉義縣大埔鄉":"607","嘉義縣水上鄉":"608","嘉義縣鹿草鄉":"611","嘉義縣太保市":"612","嘉義縣朴子市":"613","嘉義縣東石鄉":"614","嘉義縣六腳鄉":"615","嘉義縣新港鄉":"616","嘉義縣民雄鄉":"621","嘉義縣大林鎮":"622","嘉義縣溪口鄉":"623","嘉義縣義竹鄉":"624","嘉義縣布袋鎮":"625",
-"臺南市中西區":"700","台南市中西區":"700","臺南市東區":"701","台南市東區":"701","臺南市南區":"702","台南市南區":"702","臺南市北區":"704","台南市北區":"704","臺南市安平區":"708","台南市安平區":"708","臺南市安南區":"709","台南市安南區":"709","臺南市永康區":"710","台南市永康區":"710","臺南市歸仁區":"711","台南市歸仁區":"711","臺南市新化區":"712","台南市新化區":"712","臺南市左鎮區":"713","台南市左鎮區":"713","臺南市玉井區":"714","台南市玉井區":"714","臺南市楠西區":"715","台南市楠西區":"715","臺南市南化區":"716","台南市南化區":"716","臺南市仁德區":"717","台南市仁德區":"717","臺南市關廟區":"718","台南市關廟區":"718","臺南市龍崎區":"719","台南市龍崎區":"719","臺南市官田區":"720","台南市官田區":"720","臺南市麻豆區":"721","台南市麻豆區":"721","臺南市佳里區":"722","台南市佳里區":"722","臺南市西港區":"723","台南市西港區":"723","臺南市七股區":"724","台南市七股區":"724","臺南市將軍區":"725","台南市將軍區":"725","臺南市學甲區":"726","台南市學甲區":"726","臺南市北門區":"727","台南市北門區":"727","臺南市新營區":"730","台南市新營區":"730","臺南市後壁區":"731","台南市後壁區":"731","臺南市白河區":"732","台南市白河區":"732","臺南市東山區":"733","台南市東山區":"733","臺南市六甲區":"734","台南市六甲區":"734","臺南市下營區":"735","台南市下營區":"735","臺南市柳營區":"736","台南市柳營區":"736","臺南市鹽水區":"737","台南市鹽水區":"737","臺南市善化區":"741","台南市善化區":"741","臺南市大內區":"742","台南市大內區":"742","臺南市山上區":"743","台南市山上區":"743","臺南市新市區":"744","台南市新市區":"744","臺南市安定區":"745","台南市安定區":"745",
-"高雄市新興區":"800","高雄市前金區":"801","高雄市苓雅區":"802","高雄市鹽埕區":"803","高雄市鼓山區":"804","高雄市旗津區":"805","高雄市前鎮區":"806","高雄市三民區":"807","高雄市楠梓區":"811","高雄市小港區":"812","高雄市左營區":"813","高雄市仁武區":"814","高雄市大社區":"815","高雄市東沙群島":"817","高雄市南沙群島":"819","高雄市岡山區":"820","高雄市路竹區":"821","高雄市阿蓮區":"822","高雄市田寮區":"823","高雄市燕巢區":"824","高雄市橋頭區":"825","高雄市梓官區":"826","高雄市彌陀區":"827","高雄市永安區":"828","高雄市湖內區":"829","高雄市鳳山區":"830","高雄市大寮區":"831","高雄市林園區":"832","高雄市鳥松區":"833","高雄市大樹區":"840","高雄市旗山區":"842","高雄市美濃區":"843","高雄市六龜區":"844","高雄市內門區":"845","高雄市杉林區":"846","高雄市甲仙區":"847","高雄市桃源區":"848","高雄市那瑪夏區":"849","高雄市茂林區":"851","高雄市茄萣區":"852",
-"屏東縣屏東市":"900","屏東縣三地門鄉":"901","屏東縣霧台鄉":"902","屏東縣瑪家鄉":"903","屏東縣九如鄉":"904","屏東縣里港鄉":"905","屏東縣高樹鄉":"906","屏東縣鹽埔鄉":"907","屏東縣長治鄉":"908","屏東縣麟洛鄉":"909","屏東縣竹田鄉":"911","屏東縣內埔鄉":"912","屏東縣萬丹鄉":"913","屏東縣潮州鎮":"920","屏東縣泰武鄉":"921","屏東縣來義鄉":"922","屏東縣萬巒鄉":"923","屏東縣崁頂鄉":"924","屏東縣新埤鄉":"925","屏東縣南州鄉":"926","屏東縣林邊鄉":"927","屏東縣東港鎮":"928","屏東縣琉球鄉":"929","屏東縣佳冬鄉":"931","屏東縣新園鄉":"932","屏東縣枋寮鄉":"940","屏東縣枋山鄉":"941","屏東縣春日鄉":"942","屏東縣獅子鄉":"943","屏東縣車城鄉":"944","屏東縣牡丹鄉":"945","屏東縣恆春鎮":"946","屏東縣滿州鄉":"947",
-"臺東縣臺東市":"950","台東縣台東市":"950","臺東縣綠島鄉":"951","台東縣綠島鄉":"951","臺東縣蘭嶼鄉":"952","台東縣蘭嶼鄉":"952","臺東縣延平鄉":"953","台東縣延平鄉":"953","臺東縣卑南鄉":"954","台東縣卑南鄉":"954","臺東縣鹿野鄉":"955","台東縣鹿野鄉":"955","臺東縣關山鎮":"956","台東縣關山鎮":"956","臺東縣海端鄉":"957","台東縣海端鄉":"957","臺東縣池上鄉":"958","台東縣池上鄉":"958","臺東縣東河鄉":"959","台東縣東河鄉":"959","臺東縣成功鎮":"961","台東縣成功鎮":"961","臺東縣長濱鄉":"962","台東縣長濱鄉":"962","臺東縣太麻里鄉":"963","台東縣太麻里鄉":"963","臺東縣金峰鄉":"964","台東縣金峰鄉":"964","臺東縣大武鄉":"965","台東縣大武鄉":"965","臺東縣達仁鄉":"966","台東縣達仁鄉":"966",
-"花蓮縣花蓮市":"970","花蓮縣新城鄉":"971","花蓮縣秀林鄉":"972","花蓮縣吉安鄉":"973","花蓮縣壽豐鄉":"974","花蓮縣鳳林鎮":"975","花蓮縣光復鄉":"976","花蓮縣豐濱鄉":"977","花蓮縣瑞穗鄉":"978","花蓮縣萬榮鄉":"979","花蓮縣玉里鎮":"981","花蓮縣卓溪鄉":"982","花蓮縣富里鄉":"983",
-"澎湖縣馬公市":"880","澎湖縣西嶼鄉":"881","澎湖縣望安鄉":"882","澎湖縣七美鄉":"883","澎湖縣白沙鄉":"884","澎湖縣湖西鄉":"885",
-"金門縣金沙鎮":"890","金門縣金湖鎮":"891","金門縣金寧鄉":"892","金門縣金城鎮":"893","金門縣烈嶼鄉":"894","金門縣烏坵鄉":"896",
-"連江縣南竿鄉":"209","連江縣北竿鄉":"210","連江縣莒光鄉":"211","連江縣東引鄉":"212"
-};
-
-function lookupZip(addr) {
-  if (!addr) return "";
-  // 先檢查地址開頭是否已有郵遞區號
-  var existing = addr.match(/^(\d{3,6})/);
-  if (existing) return existing[1];
-  // 從對照表找最長相符
-  var best = "";
-  var bestLen = 0;
-  for (var key in TW_ZIPCODES) {
-    if (addr.indexOf(key) >= 0 && key.length > bestLen) {
-      best = TW_ZIPCODES[key];
-      bestLen = key.length;
-    }
-  }
-  return best;
-}
-
-function countItems(text) {
-  var total = 0;
-  var matches = text.match(/\*(\d+)/g);
-  if (matches) {
-    matches.forEach(function(m) {
-      total += parseInt(m.replace("*",""));
-    });
-  }
-  return total;
-}
-
-function doPrint() {
-  var sel = document.getElementById("addr-select");
-  var addrText = "";
-  if (sel) {
-    var selVal = sel.value;
-    if (selVal === "desc") {
-      addrText = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
-    } else {
-      var idx = parseInt(selVal);
-      addrText = (!isNaN(idx) && currentAddresses[idx]) ? currentAddresses[idx].address : "";
-    }
-  }
-  var finalName = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
-  var finalPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
-  var dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
-
-  var fieldTitle = document.getElementById("field-title") ? document.getElementById("field-title").value : currentTask.title;
-  var itemTextVal = document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText;
-  var totalCount = countItems(itemTextVal);
-  var staffChecked = [];
-  var staffBoxes = document.querySelectorAll('#staff-select input:checked');
-  staffBoxes.forEach(function(b){ staffChecked.push(b.value); });
-  var staffText = staffChecked.length > 0 ? staffChecked.join('、') : '';
-
-  var contactRows = "";
-  if (!currentTask.isNanbanPickup) {
-    contactRows = "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td><td class='lbl' style='width:22%;padding-left:12px;'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
-      + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>";
-  }
-
-  var printCSS = [
-    "* { box-sizing: border-box; margin: 0; padding: 0; }",
-    "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; }",
-    "@page p1 { size: A4 portrait; margin: 10mm; }",
-    "@page p2 { size: A4 landscape; margin: 10mm; }",
-    ".page1 { page: p1; }",
-    ".page2 { page: p2; page-break-before: always; }",
-    ".doc-title { font-size: 20pt; font-weight: 700; letter-spacing: 4px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }",
-    ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11pt; }",
-    ".info-table td { padding: 5px 3px; vertical-align: top; }",
-    ".info-table td.lbl { color: #444; white-space: nowrap; width: 22%; font-weight: 500; border-bottom: 1px solid #eee; }",
-    ".info-table td.val { border-bottom: 1px solid #eee; width: 28%; }",
-    ".dashed { border: none; border-top: 1px dashed #bbb; margin: 12px 0; }",
-    ".items-label { font-size: 9pt; color: #888; margin-bottom: 4px; }",
-    ".items-content { font-size: 20pt; white-space: pre-wrap; line-height: 1.8; font-weight: 500; }",
-    ".post-wrap { width: 100%; height: 100%; border: 1px solid #ccc; padding: 8mm; position: relative; font-size: 27pt; box-sizing: border-box; }",
-    ".post-row { display: flex; align-items: flex-end; margin-bottom: 4mm; gap: 3mm; }",
-    ".post-line { border-bottom: 1px solid #999; display: inline-block; }",
-    ".zip-table { border-collapse: collapse; display: inline-table; }",
-    ".zip-table td { border: 1px solid #333; width: 20px; height: 24px; text-align: center; font-size: 12pt; }",
-    ".zip-sep { border: none !important; padding: 0 2px; font-size: 12pt; }",
-    ".post-divider { border-top: 2px dashed #c00; margin: 4mm 0; }",
-    ".recv-label { color: #c00; font-weight: 700; font-size: 13pt; writing-mode: vertical-rl; margin-right: 4mm; }",
-    ".post-corner { position: absolute; top: 6mm; right: 6mm; font-size: 8pt; text-align: right; line-height: 1.6; }"
-  ].join(" ");
-
-  var page1HTML = "<div class='page1'>"
-    + "<div class='doc-title'>出 貨 單　<span style='font-size:13pt;font-weight:400;letter-spacing:0;'>(" + esc(dateLabel) + ")</span></div>"
-    + "<table class='info-table'>"
-    + "<tr><td class='lbl'>標題：</td><td class='val' style='font-weight:600;font-size:12pt;' colspan='3'>" + esc(fieldTitle) + "</td></tr>"
-    + "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td><td class='lbl' style='padding-left:6px;'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
-    + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>"
-    + (currentTask.isNanbanPickup ? "" : "")
-    + "<tr><td class='lbl'>商品數：</td><td class='val'>" + totalCount + " 件</td><td class='lbl' style='padding-left:6px;'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td></tr>"
-    + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val' colspan='3'></td></tr>"
-    + "</table>"
-    + "<hr class='dashed'>"
-    + "<div class='items-label'>商品內容</div>"
-    + "<div class='items-content'>" + esc(document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText) + "</div>"
-    + "</div>";
-
-  var recvName2 = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
-  var recvPhone2 = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
-  var recvAddr2 = addrText;
-  var recvZip2 = lookupZip(recvAddr2);
-  var recvAddrClean2 = recvAddr2.replace(/^\d{3,6}/, "").trim();
-  var senderZip2 = "717";
-
-  function zipBoxes2(zip, count) {
-    var boxes = "";
-    for (var i = 0; i < count; i++) {
-      boxes += "<td>" + (zip[i]||"") + "</td>";
-    }
-    return boxes;
-  }
-
-  var page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
-    + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;'>"
-    + "<div class='post-corner' style='font-size:27pt;'>特約戶編號：<br>704009001383</div>"
-    // 寄件人區塊
-    + "<div>"
-    + "<div class='post-row'><span style='color:#c00;font-weight:700;font-size:36pt;'>（寄件人）</span>"
-    + "<table class='zip-table' style='margin-left:4mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
-    + "<div class='post-row' style='font-size:36pt;margin-top:3mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
-    + "<div class='post-row' style='font-size:36pt;margin-top:3mm;'>姓名：<span class='post-line' style='min-width:60mm;'>雋永紙藝</span>"
-    + "<span style='margin-left:8mm;font-size:36pt;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
-    + "</div>"
-    + "<div class='post-divider'></div>"
-    // 收件人區塊
-    + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"
-    + "<div class='post-row'><table class='zip-table' style='transform:scale(3.5);transform-origin:left center;margin:6mm 0 14mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
-    + "<div class='post-row' style='margin-top:4mm;align-items:flex-start;'>"
-    + "<span class='recv-label' style='font-size:65pt;margin-right:6mm;'>收件人</span>"
-    + "<div style='flex:1;'>"
-    + "<div class='post-row' style='font-size:40pt;margin-bottom:5mm;'>地址：<span class='post-line' style='flex:1;font-size:40pt;'>" + esc(recvAddrClean2) + "</span></div>"
-    + "<div class='post-row' style='font-size:40pt;margin-bottom:5mm;'>姓名：<span class='post-line' style='flex:1;font-size:59pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
-    + "<div class='post-row' style='font-size:40pt;'>電話：<span class='post-line' style='flex:1;font-size:54pt;'>" + esc(recvPhone2) + "</span></div>"
-    + "</div></div>"
-    + "</div>"
-    + "<div class='post-divider'></div>"
-    // 底部
-    + "<div style='font-size:29pt;color:#555;line-height:1.8;'>"
-    + "<div>內容物：紙藝品　　無法投遞處理方式：退回寄件人</div>"
-    + "</div>"
-    + "</div>"
-    + "</div>";
-
-  var printBody = page1HTML + page2HTML;
-
-  var win = window.open("", "_blank", "width=800,height=700");
-  win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>出貨單</title><style>" + printCSS + "</style></head><body>" + printBody + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");
-  win.document.close();
 }
 
 function backToSearch() {

@@ -297,7 +297,7 @@ function doPrint() {
     ".dashed { border: none; border-top: 1px dashed #bbb; margin: 12px 0; }",
     ".items-label { font-size: 9pt; color: #888; margin-bottom: 4px; }",
     ".items-content { font-size: 20pt; white-space: pre-wrap; line-height: 1.8; font-weight: 500; }",
-    ".post-wrap { width: 100%; height: 100%; border: 1px solid #ccc; padding: 8mm; position: relative; font-size: 15pt; box-sizing: border-box; }",
+    ".post-wrap { width: 100%; height: 100%; border: 1px solid #ccc; padding: 8mm; position: relative; font-size: 27pt; box-sizing: border-box; }",
     ".post-row { display: flex; align-items: flex-end; margin-bottom: 4mm; gap: 3mm; }",
     ".post-line { border-bottom: 1px solid #999; display: inline-block; }",
     ".zip-table { border-collapse: collapse; display: inline-table; }",
@@ -340,30 +340,30 @@ function doPrint() {
 
   var page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
     + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;'>"
-    + "<div class='post-corner' style='font-size:15pt;'>特約戶編號：<br>704009001383</div>"
+    + "<div class='post-corner' style='font-size:27pt;'>特約戶編號：<br>704009001383</div>"
     // 寄件人區塊
     + "<div>"
-    + "<div class='post-row'><span style='color:#c00;font-weight:700;font-size:20pt;'>（寄件人）</span>"
+    + "<div class='post-row'><span style='color:#c00;font-weight:700;font-size:36pt;'>（寄件人）</span>"
     + "<table class='zip-table' style='margin-left:4mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
-    + "<div class='post-row' style='font-size:20pt;margin-top:3mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
-    + "<div class='post-row' style='font-size:20pt;margin-top:3mm;'>姓名：<span class='post-line' style='min-width:60mm;'>雋永紙藝</span>"
-    + "<span style='margin-left:8mm;font-size:20pt;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
+    + "<div class='post-row' style='font-size:36pt;margin-top:3mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
+    + "<div class='post-row' style='font-size:36pt;margin-top:3mm;'>姓名：<span class='post-line' style='min-width:60mm;'>雋永紙藝</span>"
+    + "<span style='margin-left:8mm;font-size:36pt;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
     + "</div>"
     + "<div class='post-divider'></div>"
     // 收件人區塊
     + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"
-    + "<div class='post-row'><table class='zip-table' style='transform:scale(1.95);transform-origin:left center;margin:4mm 0 8mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
+    + "<div class='post-row'><table class='zip-table' style='transform:scale(3.5);transform-origin:left center;margin:6mm 0 14mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
     + "<div class='post-row' style='margin-top:4mm;align-items:flex-start;'>"
-    + "<span class='recv-label' style='font-size:36pt;margin-right:6mm;'>收件人</span>"
+    + "<span class='recv-label' style='font-size:65pt;margin-right:6mm;'>收件人</span>"
     + "<div style='flex:1;'>"
-    + "<div class='post-row' style='font-size:22pt;margin-bottom:5mm;'>地址：<span class='post-line' style='flex:1;font-size:22pt;'>" + esc(recvAddrClean2) + "</span></div>"
-    + "<div class='post-row' style='font-size:22pt;margin-bottom:5mm;'>姓名：<span class='post-line' style='flex:1;font-size:33pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
-    + "<div class='post-row' style='font-size:22pt;'>電話：<span class='post-line' style='flex:1;font-size:30pt;'>" + esc(recvPhone2) + "</span></div>"
+    + "<div class='post-row' style='font-size:40pt;margin-bottom:5mm;'>地址：<span class='post-line' style='flex:1;font-size:40pt;'>" + esc(recvAddrClean2) + "</span></div>"
+    + "<div class='post-row' style='font-size:40pt;margin-bottom:5mm;'>姓名：<span class='post-line' style='flex:1;font-size:59pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
+    + "<div class='post-row' style='font-size:40pt;'>電話：<span class='post-line' style='flex:1;font-size:54pt;'>" + esc(recvPhone2) + "</span></div>"
     + "</div></div>"
     + "</div>"
     + "<div class='post-divider'></div>"
     // 底部
-    + "<div style='font-size:16pt;color:#555;line-height:1.8;'>"
+    + "<div style='font-size:29pt;color:#555;line-height:1.8;'>"
     + "<div>內容物：紙藝品　　無法投遞處理方式：退回寄件人</div>"
     + "</div>"
     + "</div>"

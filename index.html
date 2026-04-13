@@ -201,8 +201,8 @@ function renderDetail(detail) {
     + '<input type="range" id="p1-size" min="10" max="36" value="20" style="width:100%;margin-top:6px;" oninput="document.getElementById(\"p1-size-val\").textContent=this.value">'
     + '</div>'
     + '<div class="field">'
-    + '<div class="field-label">第二頁字體大小 <span id="p2-size-val">10</span>pt</div>'
-    + '<input type="range" id="p2-size" min="6" max="24" value="10" style="width:100%;margin-top:6px;" oninput="document.getElementById(\"p2-size-val\").textContent=this.value">'
+    + '<div class="field-label">第二頁字體大小 <span id="p2-size-val">14</span>pt</div>'
+    + '<input type="range" id="p2-size" min="6" max="40" value="14" style="width:100%;margin-top:6px;" oninput="document.getElementById(\"p2-size-val\").textContent=this.value">'
     + '</div>'
     + '<div class="divider"></div>'
     + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
@@ -348,30 +348,31 @@ function doPrint() {
     return boxes;
   }
 
-  var p2FontSize = document.getElementById('p2-size') ? document.getElementById('p2-size').value : '10';
+  var p2FontSize = document.getElementById('p2-size') ? parseInt(document.getElementById('p2-size').value) : 14;
+  var p2s = p2FontSize; // base
   var page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
-    + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;font-size:' + p2FontSize + 'pt;'>"
-    + "<div class='post-corner' style='font-size:8pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
+    + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;font-size:" + p2s + "pt;'>"
+    + "<div class='post-corner' style='font-size:" + Math.round(p2s*0.7) + "pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
     + "<div>"
-    + "<div class='post-row' style='font-size:' + (0.9 * p2FontSize) + 'pt;><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
+    + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
     + "<table class='zip-table' style='margin-left:3mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
-    + "<div class='post-row' style='font-size:9pt;margin-top:1mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
-    + "<div class='post-row' style='font-size:9pt;margin-top:1mm;'>姓名：<span class='post-line' style='min-width:40mm;'>雋永紙藝</span>"
+    + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
+    + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>姓名：<span class='post-line' style='min-width:40mm;'>雋永紙藝</span>"
     + "<span style='margin-left:5mm;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
     + "</div>"
     + "<div class='post-divider'></div>"
     + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"
-    + "<div class='post-row'><table class='zip-table' style='transform:scale(1.4);transform-origin:left center;margin:2mm 0 6mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
+    + "<div class='post-row'><table class='zip-table' style='transform:scale(" + (p2s/10).toFixed(1) + ");transform-origin:left center;margin:2mm 0 " + Math.round(p2s*0.5) + "mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
     + "<div class='post-row' style='margin-top:2mm;align-items:flex-start;'>"
-    + "<span class='recv-label' style='font-size:16pt;margin-right:4mm;'>收件人</span>"
+    + "<span class='recv-label' style='font-size:" + Math.round(p2s*1.6) + "pt;margin-right:4mm;'>收件人</span>"
     + "<div style='flex:1;'>"
-    + "<div class='post-row' style='font-size:10pt;margin-bottom:3mm;'>地址：<span class='post-line' style='flex:1;font-size:' + (1.0 * p2FontSize) + 'pt;>" + esc(recvAddrClean2) + "</span></div>"
-    + "<div class='post-row' style='font-size:10pt;margin-bottom:3mm;'>姓名：<span class='post-line' style='flex:1;font-size:16pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
-    + "<div class='post-row' style='font-size:' + (1.0 * p2FontSize) + 'pt;>電話：<span class='post-line' style='flex:1;font-size:' + (1.3 * p2FontSize) + 'pt;>" + esc(recvPhone2) + "</span></div>"
+    + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:" + Math.round(p2s*0.3) + "mm;'>地址：<span class='post-line' style='flex:1;'>" + esc(recvAddrClean2) + "</span></div>"
+    + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:" + Math.round(p2s*0.3) + "mm;'>姓名：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.4) + "pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
+    + "<div class='post-row' style='font-size:" + p2s + "pt;'>電話：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.2) + "pt;'>" + esc(recvPhone2) + "</span></div>"
     + "</div></div>"
     + "</div>"
     + "<div class='post-divider'></div>"
-    + "<div style='font-size:8pt;color:#555;line-height:1.8;'>"
+    + "<div style='font-size:" + Math.round(p2s*0.75) + "pt;color:#555;line-height:1.8;'>"
     + "<div>內容物：紙藝品　　無法投遞處理方式：退回寄件人</div>"
     + "</div>"
     + "</div>"

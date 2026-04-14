@@ -291,6 +291,7 @@ function doPrint() {
       + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>";
   }
 
+  var p1FontSize = document.getElementById("p1-size") ? parseInt(document.getElementById("p1-size").value) : 20;
   var printCSS = [
     "* { box-sizing: border-box; margin: 0; padding: 0; }",
     "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; }",
@@ -299,8 +300,8 @@ function doPrint() {
     ".page1 { page: p1; width: 190mm; min-height: 267mm; }",
     ".page2 { page: p2; page-break-before: always; width: 277mm; min-height: 190mm; }",
     "html, body { -webkit-print-color-adjust: exact; }",
-    ".doc-title { font-size: 32pt; font-weight: 700; letter-spacing: 4px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }",
-    ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 18pt; }",
+    ".doc-title { font-size: " + Math.round(p1FontSize * 1.2) + "pt; font-weight: 700; letter-spacing: 4px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }",
+    ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: " + Math.round(p1FontSize * 0.7) + "pt; }",
     ".info-table td { padding: 5px 3px; vertical-align: top; }",
     ".info-table td.lbl { color: #444; white-space: nowrap; width: 22%; font-weight: 500; border-bottom: 1px solid #eee; }",
     ".info-table td.val { border-bottom: 1px solid #eee; width: 28%; }",

@@ -396,6 +396,17 @@ function esc(str) {
   return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+document.addEventListener("input", function(e) {
+  if (e.target.id === "p1-size") {
+    var el = document.getElementById("p1-size-val");
+    if (el) el.textContent = e.target.value;
+  }
+  if (e.target.id === "p2-size") {
+    var el = document.getElementById("p2-size-val");
+    if (el) el.textContent = e.target.value;
+  }
+});
+
 document.getElementById("search-input").addEventListener("keydown", function(e) {
   if (e.key === "Enter") searchTasks();
 });

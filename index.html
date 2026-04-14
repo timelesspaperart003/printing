@@ -207,6 +207,7 @@ function renderDetail(detail) {
     + '<div class="divider"></div>'
     + '<div id="print-preview" style="border:1px solid var(--border);border-radius:var(--radius);overflow:auto;background:#fff;margin-bottom:1rem;"></div>'
     + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
+  setTimeout(updatePreview, 100);
 }
 
 var TW_ZIPCODES = {

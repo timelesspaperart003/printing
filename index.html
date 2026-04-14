@@ -205,6 +205,7 @@ function renderDetail(detail) {
     + '<input type="range" id="p2-size" min="6" max="40" value="14" style="width:100%;margin-top:6px;" oninput="document.getElementById(\"p2-size-val\").textContent=this.value">'
     + '</div>'
     + '<div class="divider"></div>'
+    + '<div id="print-preview" style="border:1px solid var(--border);border-radius:var(--radius);overflow:auto;background:#fff;margin-bottom:1rem;"></div>'
     + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
 }
 
@@ -248,6 +249,77 @@ function lookupZip(addr) {
     }
   }
   return best;
+}
+
+function updatePreview() {
+  if (!currentTask) return;
+  var sel = document.getElementById("addr-select");
+  var addrText = "";
+  if (sel) {
+    var selVal = sel.value;
+    if (selVal === "desc") {
+      addrText = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
+    } else {
+      var idx = parseInt(selVal);
+      addrText = (!isNaN(idx) && currentAddresses[idx]) ? currentAddresses[idx].address : "";
+    }
+  }
+  var finalName = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
+  var finalPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
+  var fieldTitle = document.getElementById("field-title") ? document.getElementById("field-title").value : currentTask.title;
+  var itemTextVal = document.getElementById("item-text") ? document.getElementById("item-text").value : currentTask.itemText;
+  var dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
+  var p1FontSize = document.getElementById("p1-size") ? parseInt(document.getElementById("p1-size").value) : 20;
+  var p2FontSize = document.getElementById("p2-size") ? parseInt(document.getElementById("p2-size").value) : 14;
+  var staffChecked = [];
+  var staffBoxes = document.querySelectorAll("#staff-select input:checked");
+  staffBoxes.forEach(function(b){ staffChecked.push(b.value); });
+  var staffText = staffChecked.join("、");
+  var totalCount = countItems(itemTextVal);
+
+  var previewCSS = "body{margin:0;padding:0;font-family:'Microsoft JhengHei','PingFang TC',sans-serif;}"
+    + ".page{width:148mm;min-height:105mm;padding:6mm;box-sizing:border-box;border:1px solid #ddd;margin:4px;background:white;display:inline-block;vertical-align:top;font-size:10pt;}"
+    + ".doc-title{font-size:" + Math.round(p1FontSize*0.8) + "pt;font-weight:700;border-bottom:2px solid #111;padding-bottom:4px;margin-bottom:8px;letter-spacing:2px;}"
+    + "table{width:100%;border-collapse:collapse;font-size:" + Math.round(p1FontSize*0.45) + "pt;}"
+    + "td{padding:2px 2px;border-bottom:1px solid #eee;}"
+    + ".items{font-size:" + Math.round(p1FontSize*0.65) + "pt;white-space:pre-wrap;margin-top:6px;font-weight:500;line-height:1.5;}"
+    + ".p2{font-size:" + Math.round(p2FontSize*0.65) + "pt;}"
+    + ".recv-big{font-size:" + Math.round(p2FontSize*0.9) + "pt;font-weight:700;}"
+    + ".recv-lbl{font-size:" + Math.round(p2FontSize*1.0) + "pt;font-weight:700;color:#c00;writing-mode:vertical-rl;margin-right:3px;}"
+    + ".pline{border-bottom:1px solid #999;display:inline-block;min-width:30mm;}"
+    + ".dashed{border-top:1px dashed #bbb;margin:4px 0;}";
+
+  var p1 = "<div class='page'>"
+    + "<div class='doc-title'>出 貨 單　<span style='font-size:" + Math.round(p1FontSize*0.4) + "pt;font-weight:400;'>(" + esc(dateLabel) + ")</span></div>"
+    + "<table><tr><td style='white-space:nowrap;'>標題：</td><td colspan='3' style='font-weight:600;'>" + esc(fieldTitle) + "</td></tr>"
+    + "<tr><td>收件姓名：</td><td>" + esc(finalName) + "</td><td style='padding-left:4px;'>電話：</td><td>" + esc(finalPhone) + "</td></tr>"
+    + "<tr><td>地址：</td><td colspan='3'>" + esc(addrText) + "</td></tr>"
+    + "<tr><td>商品數：</td><td>" + totalCount + " 件</td><td style='padding-left:4px;'>出貨人員：</td><td>" + esc(staffText) + "</td></tr>"
+    + "<tr><td style='height:20px;'>客戶簽收：</td><td colspan='3'></td></tr>"
+    + "</table>"
+    + "<hr class='dashed'>"
+    + "<div class='items'>" + esc(itemTextVal) + "</div>"
+    + "</div>";
+
+  var recvZipPrev = lookupZip(addrText);
+  var recvAddrCleanPrev = addrText.replace(/^\d{3,6}/, "").trim();
+  var p2 = "<div class='page p2'>"
+    + "<div style='font-size:" + Math.round(p2FontSize*0.5) + "pt;color:#c00;font-weight:700;'>（寄件人）717　台南市仁德區太子五街22巷1號　雋永紙藝</div>"
+    + "<hr class='dashed'>"
+    + "<div style='font-size:" + Math.round(p2FontSize*0.5) + "pt;margin:4px 0;'>郵遞區號：" + esc(recvZipPrev) + "</div>"
+    + "<div style='display:flex;align-items:flex-start;margin-top:4px;'>"
+    + "<span class='recv-lbl'>收件人</span>"
+    + "<div>"
+    + "<div class='p2'>地址：<span class='pline'>" + esc(recvAddrCleanPrev) + "</span></div>"
+    + "<div style='margin-top:3px;'>姓名：<span class='pline recv-big'>" + esc(finalName) + "</span></div>"
+    + "<div style='margin-top:3px;' class='p2'>電話：<span class='pline'>" + esc(finalPhone) + "</span></div>"
+    + "</div></div>"
+    + "</div>";
+
+  var previewEl = document.getElementById("print-preview");
+  if (previewEl) {
+    previewEl.innerHTML = "<style>" + previewCSS + "</style>" + p1 + p2;
+  }
 }
 
 function countItems(text) {

@@ -135,20 +135,30 @@ async function loadDetail(pageId) {
     if (detail.error) throw new Error(detail.error);
     renderDetail(detail);
     // 解析商品清單
-    var lines = (detail.itemText || "").split("\n");
-    var items = [];
-    lines.forEach(function(line) {
-      line = line.trim();
-      if (!line) return;
-      var m = line.match(/^(.+?)\s*\*(\d+)\s*$/);
-      if (m) items.push({ name: m[1].trim(), qty: m[2] });
-      else items.push({ name: line, qty: "1" });
-    });
-    if (items.length > 0) {
+    var parsed2 = parseItemText(cleanItemText(detail.itemText || ""));
+    var items = parsed2.items;
+    var giftItems = parsed2.gifts;
+    var noteLines = parsed2.notes;
+    var paymentText = parsed2.payment;
+    // store for later use
+    currentTask._gifts = giftItems;
+    currentTask._notes = noteLines;
+    currentTask._payment = paymentText;
+    var allItems = items.concat((parsed2.gifts || []).map(function(g){ return {name: g.name, qty: g.qty, isGift: true}; }));
+    if (allItems.length > 0) {
       // 第一步：先抓文字（快）
-      gasAPI({ action: "productText", items: JSON.stringify(items) }).then(function(res) {
+      gasAPI({ action: "productText", items: JSON.stringify(allItems) }).then(function(res) {
         if (res && res.results) {
-          renderProductArea(res.results);
+          var itemCount = items.length;
+          var regularResults = res.results.slice(0, itemCount);
+          var giftResults = res.results.slice(itemCount);
+          if (currentTask._gifts) {
+            currentTask._gifts = currentTask._gifts.map(function(g, i) {
+              var gr = giftResults[i] || {};
+              return { name: g.name, qty: g.qty, sku: gr.sku||'', loc: gr.loc||'', isNew: gr.isNew||false };
+            });
+          }
+          renderProductArea(regularResults);
           // 第二步：背景抓圖片（慢）
           gasAPI({ action: "productImages", items: JSON.stringify(items) }).then(function(imgRes) {
             if (imgRes && imgRes.images) {
@@ -187,15 +197,10 @@ function cleanItemText(text) {
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
     var cutIdx = -1;
-    // V/v 前後都有空格才算（例如 " V " 或 " v "）
     var vMatch = line.match(/ [Vv] /);
-    if (vMatch) {
-      cutIdx = vMatch.index;
-    }
-    // 已備好 不需要空格限制
+    if (vMatch) cutIdx = vMatch.index;
     var prepIdx = line.indexOf("已備好");
     if (prepIdx >= 0 && (cutIdx < 0 || prepIdx < cutIdx)) cutIdx = prepIdx;
-
     if (cutIdx >= 0) {
       var trimmed = line.substring(0, cutIdx).trim();
       if (trimmed) result.push(trimmed);
@@ -204,6 +209,54 @@ function cleanItemText(text) {
     }
   }
   return result.join("\n").trim();
+}
+
+// 解析說明欄：分離商品、贈品、備註、收款狀態
+function parseItemText(text) {
+  if (!text) return { items: [], gifts: [], notes: [], payment: "" };
+  var lines = text.split("\n");
+  var items = [], gifts = [], notes = [], payment = "";
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+
+    // 清理 V/v/已備好
+    var cutIdx = -1;
+    var vMatch = line.match(/ [Vv] /);
+    if (vMatch) cutIdx = vMatch.index;
+    var prepIdx = line.indexOf("已備好");
+    if (prepIdx >= 0 && (cutIdx < 0 || prepIdx < cutIdx)) cutIdx = prepIdx;
+    if (cutIdx >= 0) line = line.substring(0, cutIdx).trim();
+    if (!line) continue;
+
+    // 收款狀態
+    if (/需收款|免收款/.test(line)) {
+      payment = line;
+      continue;
+    }
+    // 贈品：以「贈」開頭
+    if (/^贈/.test(line)) {
+      var giftName = line.replace(/^贈[：:：]?\s*/, "").trim();
+      var giftQtyMatch = giftName.match(/^(.+?)\s*\*(\d+)\s*$/);
+      if (giftQtyMatch) {
+        gifts.push({ name: giftQtyMatch[1].trim(), qty: giftQtyMatch[2] });
+      } else {
+        gifts.push({ name: giftName, qty: "1" });
+      }
+      continue;
+    }
+    // 商品：有 *數字
+    if (/\*\d+/.test(line)) {
+      var m = line.match(/^(.+?)\s*\*(\d+)\s*$/);
+      if (m) items.push({ name: m[1].trim(), qty: m[2] });
+      else items.push({ name: line, qty: "1" });
+      continue;
+    }
+    // 其餘為備註
+    notes.push(line);
+  }
+  return { items: items, gifts: gifts, notes: notes, payment: payment };
 }
 
 function renderDetail(detail) {
@@ -338,6 +391,12 @@ function renderProductArea(products) {
   if (!area) return;
   if (!products || products.length === 0) { area.innerHTML = '<div class="status">無商品資料</div>'; return; }
 
+  // Build gift items list (same style as regular items but with 贈 label)
+  var giftProducts = [];
+  if (currentTask && currentTask._gifts && currentTask._gifts.length > 0) {
+    currentTask._gifts.forEach(function(g) { giftProducts.push({ name: g.name, qty: g.qty, isGift: true }); });
+  }
+
   if (currentView === "card") {
     var html = '<div class="product-grid">';
     products.forEach(function(p, idx) {
@@ -362,6 +421,26 @@ function renderProductArea(products) {
       html += '</div>';
     });
     html += '</div>';
+    // 贈品區（卡片版）
+    if (currentTask && currentTask._gifts && currentTask._gifts.length > 0) {
+      html += '<div style="margin-top:10px;padding-top:8px;border-top:2px solid #c00;">';
+      html += '<div style="color:#c00;font-weight:700;font-size:15px;margin-bottom:6px;">贈：</div>';
+      html += '<div class="product-grid">';
+      currentTask._gifts.forEach(function(g) {
+        html += '<div class="product-card">';
+        html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品</div>';
+        html += '<div class="p-body"><div class="p-name">' + esc(g.name) + '</div>';
+        html += '<div class="p-meta">數量：' + esc(g.qty) + '</div></div>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+    }
+    // 備註區（卡片版）
+    if (currentTask && currentTask._notes && currentTask._notes.length > 0) {
+      html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-size:13px;color:var(--text-muted);">';
+      html += '<span style="font-weight:600;">備註：</span>' + currentTask._notes.map(function(n){return esc(n);}).join('　');
+      html += '</div>';
+    }
     area.innerHTML = html;
   } else {
     var html = '<div class="product-list">';
@@ -384,6 +463,25 @@ function renderProductArea(products) {
       html += '</div>';
     });
     html += '</div>';
+    // 贈品區
+    if (currentTask && currentTask._gifts && currentTask._gifts.length > 0) {
+      html += '<div style="margin-top:10px;padding-top:8px;border-top:2px solid #c00;">';
+      html += '<div style="color:#c00;font-weight:700;font-size:15px;margin-bottom:6px;">贈：</div>';
+      currentTask._gifts.forEach(function(g) {
+        html += '<div class="product-list-item">';
+        html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品</div>';
+        html += '<div class="p-info"><div class="p-name">' + esc(g.name) + '</div>';
+        html += '<div class="p-meta">數量：' + esc(g.qty) + '</div></div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    // 備註區
+    if (currentTask && currentTask._notes && currentTask._notes.length > 0) {
+      html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-size:13px;color:var(--text-muted);">';
+      html += '<span style="font-weight:600;">備註：</span>' + currentTask._notes.map(function(n){return esc(n);}).join('　');
+      html += '</div>';
+    }
     area.innerHTML = html;
   }
 }
@@ -470,7 +568,7 @@ function doPrint() {
     + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>"
     + (currentTask.isNanbanPickup ? "" : "")
     + "<tr><td class='lbl'>商品數：</td><td class='val'>" + totalCount + " 件</td><td class='lbl' style='padding-left:6px;'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td></tr>"
-    + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val' colspan='3'></td></tr>"
+    + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val'></td><td class='lbl' style='padding-left:6px;color:#c00;font-weight:700;'>" + esc(currentTask._payment||"") + "</td><td class='val'></td></tr>"
     + "</table>"
     + "<hr class='dashed'>"
     + "<div class='items-label'>商品內容</div>"
@@ -520,6 +618,22 @@ function doPrint() {
         html += "</div></div>";
       });
       html += "</div>";
+    }
+    // 贈品區
+    if (currentTask._gifts && currentTask._gifts.length > 0) {
+      html += "<div style='margin-top:8px;padding-top:6px;border-top:2px solid #c00;'>";
+      html += "<div style='color:#c00;font-weight:700;font-size:" + Math.round(cardFontMd*1.3) + "pt;margin-bottom:4px;'>贈：</div>";
+      currentTask._gifts.forEach(function(g) {
+        html += "<div style='display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #f5f5f5;'>";
+        html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#fff0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>贈品</div>";
+        html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;'>" + esc(g.name) + "</div>";
+        html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(g.qty) + "</div></div></div>";
+      });
+      html += "</div>";
+    }
+    // 備註
+    if (currentTask._notes && currentTask._notes.length > 0) {
+      html += "<div style='margin-top:6px;font-size:" + cardFontSm + "pt;color:#666;'><span style='font-weight:600;'>備註：</span>" + currentTask._notes.map(function(n){return esc(n);}).join('　') + "</div>";
     }
     return html;
   })()

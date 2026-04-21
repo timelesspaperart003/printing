@@ -261,6 +261,10 @@ function renderDetail(detail) {
     + '</div></div>'
     + '<div class="divider"></div>'
     + '<div class="field">'
+    + '<div class="field-label">商品資訊大小 <span id="card-size-val">100</span>%</div>'
+    + '<input type="range" id="card-size" min="60" max="200" value="100" style="width:100%;margin-top:6px;">'
+    + '</div>'
+    + '<div class="field">'
     + '<div class="field-label">第一頁字體大小 <span id="p1-size-val">20</span>pt</div>'
     + '<input type="range" id="p1-size" min="10" max="36" value="20" style="width:100%;margin-top:6px;" oninput="document.getElementById(\"p1-size-val\").textContent=this.value">'
     + '</div>'
@@ -579,6 +583,24 @@ function esc(str) {
 }
 
 document.addEventListener("input", function(e) {
+  if (e.target.id === "card-size") {
+    var val = e.target.value;
+    document.getElementById("card-size-val").textContent = val;
+    var scale = val / 100;
+    var area = document.getElementById("product-area");
+    if (area) area.style.fontSize = (12 * scale) + "px";
+    // Scale images
+    var cardImgs = area ? area.querySelectorAll(".product-card img, .product-card .no-img") : [];
+    cardImgs.forEach(function(el) {
+      el.style.width = Math.round(60 * scale) + "px";
+      el.style.height = Math.round(60 * scale) + "px";
+    });
+    var listImgs = area ? area.querySelectorAll(".product-list-item img, .product-list-item .no-img") : [];
+    listImgs.forEach(function(el) {
+      el.style.width = Math.round(52 * scale) + "px";
+      el.style.height = Math.round(52 * scale) + "px";
+    });
+  }
   if (e.target.id === "p1-size") {
     var el = document.getElementById("p1-size-val");
     if (el) el.textContent = e.target.value;

@@ -91,16 +91,6 @@ var currentTask = null;
 var currentAddresses = [];
 
 async function gasAPI(params) {
-  // Use POST for large payloads (productText/productImages with items)
-  if (params.action === "productText" || params.action === "productImages") {
-    var url = GAS_URL + "?action=" + params.action;
-    var res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: "items=" + encodeURIComponent(params.items)
-    });
-    return await res.json();
-  }
   var url = GAS_URL + "?" + Object.keys(params).map(function(k) {
     return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
   }).join("&");
@@ -170,7 +160,9 @@ async function loadDetail(pageId) {
           }
           renderProductArea(regularResults);
           // 第二步：背景抓圖片（慢）
-          gasAPI({ action: "productImages", items: JSON.stringify(items) }).then(function(imgRes) {
+          // 只傳品名陣列，減少 URL 長度
+          var itemNames = items.map(function(i){ return i.name; });
+          gasAPI({ action: "productImages", items: JSON.stringify(itemNames) }).then(function(imgRes) {
             if (imgRes && imgRes.images) {
               imgRes.images.forEach(function(imgItem) {
                 if (!imgItem.img) return;

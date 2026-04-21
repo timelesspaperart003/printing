@@ -404,7 +404,7 @@ function renderProductArea(products) {
       if (p.isNew) {
         html += '<div class="no-img">新商品</div>';
         html += '<div class="p-body"><div class="p-name">' + esc(p.name) + '</div>';
-        html += '<div class="p-new">新商品，無資料</div></div>';
+        html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(p.qty) + '</div></div>';
       } else {
         if (p.img) {
           html += '<img src="' + p.img + '" alt="">';
@@ -448,7 +448,7 @@ function renderProductArea(products) {
       html += '<div class="product-list-item">';
       if (p.isNew) {
         html += '<div class="no-img">新商品</div>';
-        html += '<div class="p-info"><div class="p-name">' + esc(p.name) + '</div><div class="p-new">新商品，無資料</div></div>';
+        html += '<div class="p-info"><div class="p-name">' + esc(p.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(p.qty) + '</div></div>';
       } else {
         if (p.img) {
           html += '<img src="' + p.img + '" alt="">';
@@ -592,6 +592,7 @@ function doPrint() {
         html += "<div style='font-size:" + cardFontMd + "pt;font-weight:600;margin-bottom:3px;'>" + esc(p.name) + "</div>";
         if (p.isNew) {
           html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(p.qty) + "</div>";
         } else {
           html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(p.sku||"-") + "</div>";
           html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>儲位：" + esc(p.loc||"-") + "　數量：" + esc(p.qty) + "</div>";
@@ -612,6 +613,7 @@ function doPrint() {
         html += "<div style='font-size:" + cardFontMd + "pt;font-weight:600;'>" + esc(p.name) + "</div>";
         if (p.isNew) {
           html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(p.qty) + "</div>";
         } else {
           html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(p.sku||"-") + "　儲位：" + esc(p.loc||"-") + "　數量：" + esc(p.qty) + "</div>";
         }

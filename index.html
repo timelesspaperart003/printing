@@ -91,6 +91,16 @@ var currentTask = null;
 var currentAddresses = [];
 
 async function gasAPI(params) {
+  // Use POST for large payloads (productText/productImages with items)
+  if (params.action === "productText" || params.action === "productImages") {
+    var url = GAS_URL + "?action=" + params.action;
+    var res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "items=" + encodeURIComponent(params.items)
+    });
+    return await res.json();
+  }
   var url = GAS_URL + "?" + Object.keys(params).map(function(k) {
     return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
   }).join("&");

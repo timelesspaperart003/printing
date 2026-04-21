@@ -133,6 +133,47 @@ async function loadDetail(pageId) {
     var detail = await gasAPI({ action: "detail", pageId: pageId });
     if (detail.error) throw new Error(detail.error);
     renderDetail(detail);
+    // 解析商品清單
+    var lines = (detail.itemText || "").split("\n");
+    var items = [];
+    lines.forEach(function(line) {
+      line = line.trim();
+      if (!line) return;
+      var m = line.match(/^(.+?)\s*\*(\d+)\s*$/);
+      if (m) items.push({ name: m[1].trim(), qty: m[2] });
+      else items.push({ name: line, qty: "1" });
+    });
+    if (items.length > 0) {
+      // 第一步：先抓文字（快）
+      gasAPI({ action: "productText", items: JSON.stringify(items) }).then(function(res) {
+        if (res && res.results) {
+          renderProductArea(res.results);
+          // 第二步：背景抓圖片（慢）
+          gasAPI({ action: "productImages", items: JSON.stringify(items) }).then(function(imgRes) {
+            if (imgRes && imgRes.images) {
+              imgRes.images.forEach(function(imgItem) {
+                if (!imgItem.img) return;
+                currentProducts.forEach(function(p, idx) {
+                  if (p.name === imgItem.name && !p.img) {
+                    p.img = imgItem.img;
+                    var ph = document.getElementById("img-placeholder-" + idx);
+                    if (ph) {
+                      var imgEl = document.createElement("img");
+                      imgEl.src = imgItem.img;
+                      imgEl.alt = "";
+                      ph.parentNode.replaceChild(imgEl, ph);
+                    }
+                  }
+                });
+              });
+            }
+          }).catch(function() {});
+        }
+      }).catch(function() {
+        var a = document.getElementById("product-area");
+        if (a) a.innerHTML = '<div class="status error">商品資料載入失敗</div>';
+      });
+    }
   } catch(e) {
     detailEl.innerHTML = '<div class="status error">載入失敗：' + e.message + '</div>';
   }
@@ -277,9 +318,13 @@ var currentProducts = [];
 
 function switchView(view) {
   currentView = view;
-  document.getElementById("btn-card").className = view === "card" ? "active" : "";
-  document.getElementById("btn-list").className = view === "list" ? "active" : "";
-  renderProductArea(currentProducts);
+  var btnCard = document.getElementById("btn-card");
+  var btnList = document.getElementById("btn-list");
+  if (btnCard) btnCard.className = view === "card" ? "active" : "";
+  if (btnList) btnList.className = view === "list" ? "active" : "";
+  if (currentProducts && currentProducts.length > 0) {
+    renderProductArea(currentProducts);
+  }
 }
 
 function renderProductArea(products) {

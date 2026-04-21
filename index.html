@@ -290,14 +290,18 @@ function renderProductArea(products) {
 
   if (currentView === "card") {
     var html = '<div class="product-grid">';
-    products.forEach(function(p) {
+    products.forEach(function(p, idx) {
       html += '<div class="product-card">';
       if (p.isNew) {
         html += '<div class="no-img">新商品</div>';
         html += '<div class="p-name">' + esc(p.name) + '</div>';
         html += '<div class="p-new">新商品，無資料</div>';
       } else {
-        html += p.img ? '<img src="' + p.img + '" alt="">' : '<div class="no-img">無圖片</div>';
+        if (p.img) {
+          html += '<img src="' + p.img + '" alt="">';
+        } else {
+          html += '<div class="no-img" id="img-placeholder-' + idx + '"><span class="spinner"></span></div>';
+        }
         html += '<div class="p-name">' + esc(p.name) + '</div>';
         html += '<div class="p-meta">';
         html += 'SKU：' + esc(p.sku || '-') + '<br>';
@@ -311,13 +315,17 @@ function renderProductArea(products) {
     area.innerHTML = html;
   } else {
     var html = '<div class="product-list">';
-    products.forEach(function(p) {
+    products.forEach(function(p, idx) {
       html += '<div class="product-list-item">';
       if (p.isNew) {
         html += '<div class="no-img">新商品</div>';
         html += '<div class="p-info"><div class="p-name">' + esc(p.name) + '</div><div class="p-new">新商品，無資料</div></div>';
       } else {
-        html += p.img ? '<img src="' + p.img + '" alt="">' : '<div class="no-img">無圖片</div>';
+        if (p.img) {
+          html += '<img src="' + p.img + '" alt="">';
+        } else {
+          html += '<div class="no-img" id="img-placeholder-' + idx + '"><span class="spinner"></span></div>';
+        }
         html += '<div class="p-info">';
         html += '<div class="p-name">' + esc(p.name) + '</div>';
         html += '<div class="p-meta">SKU：' + esc(p.sku || '-') + '　儲位：' + esc(p.loc || '-') + '　數量：' + esc(p.qty) + '</div>';

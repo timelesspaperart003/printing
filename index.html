@@ -430,6 +430,11 @@ function doPrint() {
   }
 
   var p1FontSize = document.getElementById("p1-size") ? parseInt(document.getElementById("p1-size").value) : 20;
+  var cardScale = document.getElementById("card-size") ? parseFloat(document.getElementById("card-size").value) / 100 : 1;
+  var cardImgSize = Math.round(60 * cardScale);
+  var listImgSize = Math.round(44 * cardScale);
+  var cardFontSm = Math.round(9 * cardScale);
+  var cardFontMd = Math.round(10 * cardScale);
   var printCSS = [
     "* { box-sizing: border-box; margin: 0; padding: 0; }",
     "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; }",
@@ -481,17 +486,17 @@ function doPrint() {
       products.forEach(function(p) {
         html += "<div style='border:1px solid #eee;border-radius:6px;padding:8px;display:flex;gap:8px;align-items:flex-start;'>";
         if (p.img) {
-          html += "<img src='" + p.img + "' style='width:60px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
+          html += "<img src='" + p.img + "' style='width:" + cardImgSize + "px;height:" + cardImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
         } else {
-          html += "<div style='width:60px;height:60px;background:#f5f5f5;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9pt;color:#aaa;'>" + (p.isNew ? "新商品" : "無圖") + "</div>";
+          html += "<div style='width:" + cardImgSize + "px;height:" + cardImgSize + "px;background:#f5f5f5;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#aaa;'>" + (p.isNew ? "新商品" : "無圖") + "</div>";
         }
         html += "<div style='flex:1;'>";
-        html += "<div style='font-size:10pt;font-weight:600;margin-bottom:3px;'>" + esc(p.name) + "</div>";
+        html += "<div style='font-size:" + cardFontMd + "pt;font-weight:600;margin-bottom:3px;'>" + esc(p.name) + "</div>";
         if (p.isNew) {
-          html += "<div style='font-size:9pt;color:#c00;'>新商品，無資料</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
         } else {
-          html += "<div style='font-size:9pt;color:#666;'>SKU：" + esc(p.sku||"-") + "</div>";
-          html += "<div style='font-size:9pt;color:#666;'>儲位：" + esc(p.loc||"-") + "　數量：" + esc(p.qty) + "</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(p.sku||"-") + "</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>儲位：" + esc(p.loc||"-") + "　數量：" + esc(p.qty) + "</div>";
         }
         html += "</div></div>";
       });
@@ -501,16 +506,16 @@ function doPrint() {
       products.forEach(function(p) {
         html += "<div style='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee;'>";
         if (p.img) {
-          html += "<img src='" + p.img + "' style='width:44px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
+          html += "<img src='" + p.img + "' style='width:" + listImgSize + "px;height:" + listImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
         } else {
-          html += "<div style='width:44px;height:44px;background:#f5f5f5;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8pt;color:#aaa;'>" + (p.isNew ? "新商品" : "無圖") + "</div>";
+          html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#f5f5f5;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#aaa;'>" + (p.isNew ? "新商品" : "無圖") + "</div>";
         }
         html += "<div style='flex:1;'>";
-        html += "<div style='font-size:10pt;font-weight:600;'>" + esc(p.name) + "</div>";
+        html += "<div style='font-size:" + cardFontMd + "pt;font-weight:600;'>" + esc(p.name) + "</div>";
         if (p.isNew) {
-          html += "<div style='font-size:9pt;color:#c00;'>新商品，無資料</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
         } else {
-          html += "<div style='font-size:9pt;color:#666;'>SKU：" + esc(p.sku||"-") + "　儲位：" + esc(p.loc||"-") + "　數量：" + esc(p.qty) + "</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(p.sku||"-") + "　儲位：" + esc(p.loc||"-") + "　數量：" + esc(p.qty) + "</div>";
         }
         html += "</div></div>";
       });

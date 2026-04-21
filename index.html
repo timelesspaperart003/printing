@@ -146,8 +146,8 @@ async function loadDetail(pageId) {
     currentTask._payment = paymentText;
     var allItems = items.concat((parsed2.gifts || []).map(function(g){ return {name: g.name, qty: g.qty, isGift: true}; }));
     if (allItems.length > 0) {
-      // 第一步：先抓文字（快）
-      gasAPI({ action: "productText", items: JSON.stringify(allItems) }).then(function(res) {
+      // 一次取得文字+圖片
+      gasAPI({ action: "productAll", items: JSON.stringify(allItems) }).then(function(res) {
         if (res && res.results) {
           var itemCount = items.length;
           var regularResults = res.results.slice(0, itemCount);
@@ -155,32 +155,10 @@ async function loadDetail(pageId) {
           if (currentTask._gifts) {
             currentTask._gifts = currentTask._gifts.map(function(g, i) {
               var gr = giftResults[i] || {};
-              return { name: g.name, qty: g.qty, sku: gr.sku||'', loc: gr.loc||'', isNew: gr.isNew||false };
+              return { name: g.name, qty: g.qty, sku: gr.sku||'', loc: gr.loc||'', isNew: gr.isNew||false, img: gr.img||'' };
             });
           }
           renderProductArea(regularResults);
-          // 第二步：背景抓圖片（慢）
-          // 只傳品名陣列，減少 URL 長度
-          var itemNames = items.map(function(i){ return i.name; });
-          gasAPI({ action: "productImages", items: JSON.stringify(itemNames) }).then(function(imgRes) {
-            if (imgRes && imgRes.images) {
-              imgRes.images.forEach(function(imgItem) {
-                if (!imgItem.img) return;
-                currentProducts.forEach(function(p, idx) {
-                  if (p.name === imgItem.name && !p.img) {
-                    p.img = imgItem.img;
-                    var ph = document.getElementById("img-placeholder-" + idx);
-                    if (ph) {
-                      var imgEl = document.createElement("img");
-                      imgEl.src = imgItem.img;
-                      imgEl.alt = "";
-                      ph.parentNode.replaceChild(imgEl, ph);
-                    }
-                  }
-                });
-              });
-            }
-          }).catch(function() {});
         }
       }).catch(function() {
         var a = document.getElementById("product-area");

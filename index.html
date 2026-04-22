@@ -565,6 +565,22 @@ function lookupDistrict(addr) {
 }
 
 /**
+ * 檢查地址是否命中除外街道清單
+ * @param {string} addr - 收件地址
+ * @param {string[]} unservicedStreets - 除外街道清單
+ * @returns {string|null} 命中時回傳街道名，否則回傳 null
+ */
+function checkUnservicedStreet(addr, unservicedStreets) {
+  if (!addr || !unservicedStreets || unservicedStreets.length === 0) return null;
+  for (var i = 0; i < unservicedStreets.length; i++) {
+    var street = unservicedStreets[i];
+    if (!street) continue;
+    if (addr.indexOf(street) >= 0) return street;
+  }
+  return null;
+}
+
+/**
  * 核心：判斷快捷區域 + 整合寄件郵局截郵時刻
  * 從台南 717 寄出的角度：
  *   - 收件地 L1/L2 (主要都市名單內) → 主要都市間互寄 → 當日到，用 L1 截郵
@@ -616,6 +632,21 @@ function getShippingZone(addr) {
 
   var level = info.level;
   var cityDist = info.city + info.district;
+  var unservicedStreets = info.unservicedStreets || [];
+
+  // 【核心】先檢查地址是否在除外街道清單 → 命中就降級為紅色警示
+  var matchedStreet = checkUnservicedStreet(addr, unservicedStreets);
+  if (matchedStreet) {
+    return {
+      zoneType: 'unserviced', zoneColor: 'red',
+      zoneTitle: '❌ 此街道未開辦快捷 · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '⚠️ 命中「' + matchedStreet + '」除外街道，時效不保證',
+      backupLine: '📦 強烈建議改：黑貓 / 順豐',
+      canSameDay: false, cutoffKind: null,
+      district: cityDist, zip3: zip3,
+      matchedStreet: matchedStreet
+    };
+  }
 
   // L1 主要都市 or L2 區域互寄（從 717 寄出，兩者都走「主要都市間互寄」規則 → 11:00 前當日）
   if (level.indexOf('L1') === 0 || level.indexOf('L2') === 0) {
@@ -631,10 +662,25 @@ function getShippingZone(addr) {
 
   // L3 周邊（台南不在區域互寄路線 → 隔日）
   if (level.indexOf('L3') === 0) {
+    // 若此區註記了「部分未開辦」但地址沒命中 → 提示還是要留意
+    var hasUnservFlag = unservicedStreets.length > 0;
     return {
       zoneType: 'l3', zoneColor: 'green',
       zoneTitle: '🟢 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
-      postLine: '郵局隔日到（非台南區域互寄路線）',
+      postLine: '郵局隔日到（非台南區域互寄路線）' + (hasUnservFlag ? '｜⚠️ 注意部分街道' : ''),
+      backupLine: '備援：黑貓 / 順豐 隔日',
+      canSameDay: false, cutoffKind: null,
+      district: cityDist, zip3: zip3
+    };
+  }
+
+  // L7 有快捷但非主要都市（隔日到）
+  if (level.indexOf('L7') === 0) {
+    var hasUnservFlag2 = unservicedStreets.length > 0;
+    return {
+      zoneType: 'l7', zoneColor: 'green',
+      zoneTitle: '🟢 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '有快捷投遞 · 隔日到' + (hasUnservFlag2 ? '｜⚠️ 注意部分街道' : ''),
       backupLine: '備援：黑貓 / 順豐 隔日',
       canSameDay: false, cutoffKind: null,
       district: cityDist, zip3: zip3

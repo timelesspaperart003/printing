@@ -75,13 +75,18 @@
   }
   .shipping-box .sb-title { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
   .shipping-box .sb-row { display: flex; gap: 6px; align-items: baseline; }
-  .shipping-box .sb-row .sb-k { opacity: 0.75; min-width: 50px; }
+  .shipping-box .sb-row .sb-k { opacity: 0.75; min-width: 50px; flex-shrink: 0; }
   .shipping-box.zone-green { background: var(--zone-green-bg); border-color: var(--zone-green-bd); color: var(--zone-green-fg); }
   .shipping-box.zone-yellow { background: var(--zone-yellow-bg); border-color: var(--zone-yellow-bd); color: var(--zone-yellow-fg); }
   .shipping-box.zone-red { background: var(--zone-red-bg); border-color: var(--zone-red-bd); color: var(--zone-red-fg); }
-  .shipping-box .sb-time {
+  .shipping-box.zone-gray { background: var(--zone-gray-bg); border-color: var(--zone-gray-bd); color: var(--zone-gray-fg); }
+  .shipping-box .sb-post {
     margin-top: 6px; padding-top: 6px; border-top: 1px dashed currentColor;
-    font-weight: 600; opacity: 0.95;
+    font-weight: 600;
+  }
+  .shipping-box .sb-time {
+    margin-top: 4px;
+    font-weight: 700;
   }
   .shipping-box .sb-time.t-green { color: #1b5e20; }
   .shipping-box .sb-time.t-yellow { color: #e65100; }
@@ -92,6 +97,10 @@
     margin-top: 6px; padding-top: 6px; border-top: 1px dashed currentColor;
     font-weight: 600; color: #6a1b9a;
   }
+
+  /* 寄件郵局選單 */
+  .sender-post-wrap { margin-top: 8px; }
+  .sender-post-wrap select { font-size: 14px; padding: 8px 10px; }
 
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -126,6 +135,13 @@ var GAS_URL = "https://script.google.com/macros/s/AKfycbx32ewy-B-1_dJ3NXlFgWI18U
 var currentTask = null;
 var currentAddresses = [];
 var shippingTimer = null;
+var POSTAL_ZONES_MAP = null;   // 快捷投遞區域對照表（首次從 GS 載入後快取）
+var SENDER_POSTS = [];         // 寄件郵局列表
+var DEFAULT_POST_IDX = 0;      // 預設寄件郵局的 index
+var SELECTED_POST_IDX = 0;     // 目前選中的寄件郵局 index
+
+// 啟動時預載兩份資料（之後切地址/時間不用再打 API）
+preloadShippingData();
 
 async function gasAPI(params) {
   var url = GAS_URL + "?" + Object.keys(params).map(function(k) {
@@ -133,6 +149,22 @@ async function gasAPI(params) {
   }).join("&");
   var res = await fetch(url);
   return await res.json();
+}
+
+async function preloadShippingData() {
+  try {
+    var zones = await gasAPI({ action: "getPostalZones" });
+    if (zones && !zones.error) POSTAL_ZONES_MAP = zones;
+  } catch(e) { console.warn('載入快捷投遞區域失敗', e); }
+  try {
+    var sp = await gasAPI({ action: "getSenderPosts" });
+    if (sp && sp.posts && sp.posts.length > 0) {
+      SENDER_POSTS = sp.posts;
+      for (var i = 0; i < SENDER_POSTS.length; i++) {
+        if (SENDER_POSTS[i].isDefault) { DEFAULT_POST_IDX = i; SELECTED_POST_IDX = i; break; }
+      }
+    }
+  } catch(e) { console.warn('載入寄件郵局失敗', e); }
 }
 
 async function searchTasks() {
@@ -171,7 +203,6 @@ async function loadDetail(pageId) {
     var detail = await gasAPI({ action: "detail", pageId: pageId });
     if (detail.error) throw new Error(detail.error);
     renderDetail(detail);
-    // 解析商品清單
     var parsed2 = parseItemText(cleanItemText(detail.itemText || ""));
     var items = parsed2.items;
     var giftItems = parsed2.gifts;
@@ -230,11 +261,9 @@ function parseItemText(text) {
   if (!text) return { items: [], gifts: [], notes: [], payment: "" };
   var lines = text.split("\n");
   var items = [], gifts = [], notes = [], payment = "";
-
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     if (!line) continue;
-
     var cutIdx = -1;
     var vMatch = line.match(/ [Vv] /);
     if (vMatch) cutIdx = vMatch.index;
@@ -242,19 +271,12 @@ function parseItemText(text) {
     if (prepIdx >= 0 && (cutIdx < 0 || prepIdx < cutIdx)) cutIdx = prepIdx;
     if (cutIdx >= 0) line = line.substring(0, cutIdx).trim();
     if (!line) continue;
-
-    if (/需收款|免收款/.test(line)) {
-      payment = line;
-      continue;
-    }
+    if (/需收款|免收款/.test(line)) { payment = line; continue; }
     if (/^贈/.test(line)) {
       var giftName = line.replace(/^贈[：:：]?\s*/, "").trim();
       var giftQtyMatch = giftName.match(/^(.+?)\s*\*(\d+)\s*$/);
-      if (giftQtyMatch) {
-        gifts.push({ name: giftQtyMatch[1].trim(), qty: giftQtyMatch[2] });
-      } else {
-        gifts.push({ name: giftName, qty: "1" });
-      }
+      if (giftQtyMatch) gifts.push({ name: giftQtyMatch[1].trim(), qty: giftQtyMatch[2] });
+      else gifts.push({ name: giftName, qty: "1" });
       continue;
     }
     if (/\*\d+/.test(line)) {
@@ -289,6 +311,17 @@ function renderDetail(detail) {
   currentTask = { title: detail.title, date: detail.date, itemText: cleanedItemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
   currentAddresses = customers;
 
+  // 寄件郵局下拉
+  var senderOptions = "";
+  if (SENDER_POSTS && SENDER_POSTS.length > 0) {
+    SENDER_POSTS.forEach(function(p, i) {
+      senderOptions += '<option value="' + i + '"' + (i === SELECTED_POST_IDX ? ' selected' : '') + '>'
+        + esc(p.shortName + '｜' + p.name) + '</option>';
+    });
+  } else {
+    senderOptions = '<option value="0">（載入中...）</option>';
+  }
+
   var titleVal = esc(detail.title) + (isPickup ? "（自取）" : "");
   var contactFields = '<div class="field"><div class="field-label">標題</div>'
     + '<input type="text" id="field-title" value="' + titleVal + '" style="margin-top:5px;font-size:15px;font-weight:500;" /></div>';
@@ -299,6 +332,10 @@ function renderDetail(detail) {
       + '<input type="text" id="field-phone" value="' + esc(finalPhone) + '" placeholder="電話" style="margin-top:5px;" /></div>'
       + '<div class="field"><div class="field-label">收件地址</div>'
       + '<select id="addr-select" style="margin-top:5px;" onchange="updateShippingBox()">' + addrOptions + '</select>'
+      + '<div class="sender-post-wrap">'
+      +   '<div class="field-label" style="margin-top:8px;">🏤 寄件郵局</div>'
+      +   '<select id="sender-post-select" onchange="onSenderPostChange()">' + senderOptions + '</select>'
+      + '</div>'
       + '<div id="shipping-box-container"></div>'
       + '</div>';
   }
@@ -339,169 +376,227 @@ function renderDetail(detail) {
     + '<div class="divider"></div>'
     + '<button class="primary" onclick="doPrint()">列印出貨單</button>';
 
-  // 初始化快捷區域顯示並啟動計時器
   setTimeout(function() {
     updateShippingBox();
     if (shippingTimer) clearInterval(shippingTimer);
-    shippingTimer = setInterval(updateShippingBox, 30 * 1000); // 每 30 秒更新一次
+    shippingTimer = setInterval(updateShippingBox, 30 * 1000);
   }, 50);
 }
 
-var TW_ZIPCODES = {
-"基隆市仁愛區":"200","基隆市信義區":"201","基隆市中正區":"202","基隆市中山區":"203","基隆市安樂區":"204","基隆市暖暖區":"205","基隆市七堵區":"206",
-"臺北市中正區":"100","台北市中正區":"100","臺北市大同區":"103","台北市大同區":"103","臺北市中山區":"104","台北市中山區":"104","臺北市松山區":"105","台北市松山區":"105","臺北市大安區":"106","台北市大安區":"106","臺北市萬華區":"108","台北市萬華區":"108","臺北市信義區":"110","台北市信義區":"110","臺北市士林區":"111","台北市士林區":"111","臺北市北投區":"112","台北市北投區":"112","臺北市內湖區":"114","台北市內湖區":"114","臺北市南港區":"115","台北市南港區":"115","臺北市文山區":"116","台北市文山區":"116",
-"新北市萬里區":"207","新北市金山區":"208","新北市板橋區":"220","新北市汐止區":"221","新北市深坑區":"222","新北市石碇區":"223","新北市瑞芳區":"224","新北市平溪區":"226","新北市雙溪區":"227","新北市貢寮區":"228","新北市新店區":"231","新北市坪林區":"232","新北市烏來區":"233","新北市永和區":"234","新北市中和區":"235","新北市土城區":"236","新北市三峽區":"237","新北市樹林區":"238","新北市鶯歌區":"239","新北市三重區":"241","新北市新莊區":"242","新北市泰山區":"243","新北市林口區":"244","新北市蘆洲區":"247","新北市五股區":"248","新北市八里區":"249","新北市淡水區":"251","新北市三芝區":"252","新北市石門區":"253",
-"宜蘭縣宜蘭市":"260","宜蘭縣頭城鎮":"261","宜蘭縣礁溪鄉":"262","宜蘭縣壯圍鄉":"263","宜蘭縣員山鄉":"264","宜蘭縣羅東鎮":"265","宜蘭縣三星鄉":"266","宜蘭縣大同鄉":"267","宜蘭縣五結鄉":"268","宜蘭縣冬山鄉":"269","宜蘭縣蘇澳鎮":"270","宜蘭縣南澳鄉":"272","宜蘭縣釣魚台列嶼":"290",
-"桃園市中壢區":"320","桃園市平鎮區":"324","桃園市龍潭區":"325","桃園市楊梅區":"326","桃園市新屋區":"327","桃園市觀音區":"328","桃園市桃園區":"330","桃園市龜山區":"333","桃園市八德區":"334","桃園市大溪區":"335","桃園市復興區":"336","桃園市大園區":"337","桃園市蘆竹區":"338",
-"新竹市東區":"300","新竹市北區":"300","新竹市香山區":"300",
-"新竹縣竹北市":"302","新竹縣湖口鄉":"303","新竹縣新豐鄉":"304","新竹縣新埔鎮":"305","新竹縣關西鎮":"306","新竹縣芎林鄉":"307","新竹縣寶山鄉":"308","新竹縣竹東鎮":"310","新竹縣五峰鄉":"311","新竹縣橫山鄉":"312","新竹縣尖石鄉":"313","新竹縣北埔鄉":"314","新竹縣峨眉鄉":"315",
-"苗栗縣竹南鎮":"350","苗栗縣頭份市":"351","苗栗縣三灣鄉":"352","苗栗縣南庄鄉":"353","苗栗縣獅潭鄉":"354","苗栗縣後龍鎮":"356","苗栗縣通霄鎮":"357","苗栗縣苑裡鎮":"358","苗栗縣苗栗市":"360","苗栗縣造橋鄉":"361","苗栗縣頭屋鄉":"362","苗栗縣公館鄉":"363","苗栗縣大湖鄉":"364","苗栗縣泰安鄉":"365","苗栗縣銅鑼鄉":"366","苗栗縣三義鄉":"367","苗栗縣西湖鄉":"368","苗栗縣卓蘭鎮":"369",
-"臺中市中區":"400","台中市中區":"400","臺中市東區":"401","台中市東區":"401","臺中市南區":"402","台中市南區":"402","臺中市西區":"403","台中市西區":"403","臺中市北區":"404","台中市北區":"404","臺中市北屯區":"406","台中市北屯區":"406","臺中市西屯區":"407","台中市西屯區":"407","臺中市南屯區":"408","台中市南屯區":"408","臺中市太平區":"411","台中市太平區":"411","臺中市大里區":"412","台中市大里區":"412","臺中市霧峰區":"413","台中市霧峰區":"413","臺中市烏日區":"414","台中市烏日區":"414","臺中市豐原區":"420","台中市豐原區":"420","臺中市后里區":"421","台中市后里區":"421","臺中市石岡區":"422","台中市石岡區":"422","臺中市東勢區":"423","台中市東勢區":"423","臺中市和平區":"424","台中市和平區":"424","臺中市新社區":"426","台中市新社區":"426","臺中市潭子區":"427","台中市潭子區":"427","臺中市大雅區":"428","台中市大雅區":"428","臺中市神岡區":"429","台中市神岡區":"429","臺中市大肚區":"432","台中市大肚區":"432","臺中市沙鹿區":"433","台中市沙鹿區":"433","臺中市龍井區":"434","台中市龍井區":"434","臺中市梧棲區":"435","台中市梧棲區":"435","臺中市清水區":"436","台中市清水區":"436","臺中市大甲區":"437","台中市大甲區":"437","臺中市外埔區":"438","台中市外埔區":"438","臺中市大安區":"439","台中市大安區":"439",
-"彰化縣彰化市":"500","彰化縣芬園鄉":"502","彰化縣花壇鄉":"503","彰化縣秀水鄉":"504","彰化縣鹿港鎮":"505","彰化縣福興鄉":"506","彰化縣線西鄉":"507","彰化縣和美鎮":"508","彰化縣伸港鄉":"509","彰化縣員林市":"510","彰化縣社頭鄉":"511","彰化縣永靖鄉":"512","彰化縣埔心鄉":"513","彰化縣溪湖鎮":"514","彰化縣大村鄉":"515","彰化縣埔鹽鄉":"516","彰化縣田中鎮":"520","彰化縣北斗鎮":"521","彰化縣田尾鄉":"522","彰化縣埤頭鄉":"523","彰化縣溪州鄉":"524","彰化縣竹塘鄉":"525","彰化縣二林鎮":"526","彰化縣大城鄉":"527","彰化縣芳苑鄉":"528","彰化縣二水鄉":"530",
-"南投縣南投市":"540","南投縣中寮鄉":"541","南投縣草屯鎮":"542","南投縣國姓鄉":"544","南投縣埔里鎮":"545","南投縣仁愛鄉":"546","南投縣名間鄉":"551","南投縣集集鎮":"552","南投縣水里鄉":"553","南投縣魚池鄉":"555","南投縣信義鄉":"556","南投縣竹山鎮":"557","南投縣鹿谷鄉":"558",
-"雲林縣斗南鎮":"630","雲林縣大埤鄉":"631","雲林縣虎尾鎮":"632","雲林縣土庫鎮":"633","雲林縣褒忠鄉":"634","雲林縣東勢鄉":"635","雲林縣台西鄉":"636","雲林縣崙背鄉":"637","雲林縣麥寮鄉":"638","雲林縣斗六市":"640","雲林縣林內鄉":"643","雲林縣古坑鄉":"646","雲林縣莿桐鄉":"647","雲林縣西螺鎮":"648","雲林縣二崙鄉":"649","雲林縣北港鎮":"651","雲林縣水林鄉":"652","雲林縣口湖鄉":"653","雲林縣四湖鄉":"654","雲林縣元長鄉":"655",
-"嘉義市東區":"600","嘉義市西區":"600",
-"嘉義縣番路鄉":"602","嘉義縣梅山鄉":"603","嘉義縣竹崎鄉":"604","嘉義縣阿里山鄉":"605","嘉義縣中埔鄉":"606","嘉義縣大埔鄉":"607","嘉義縣水上鄉":"608","嘉義縣鹿草鄉":"611","嘉義縣太保市":"612","嘉義縣朴子市":"613","嘉義縣東石鄉":"614","嘉義縣六腳鄉":"615","嘉義縣新港鄉":"616","嘉義縣民雄鄉":"621","嘉義縣大林鎮":"622","嘉義縣溪口鄉":"623","嘉義縣義竹鄉":"624","嘉義縣布袋鎮":"625",
-"臺南市中西區":"700","台南市中西區":"700","臺南市東區":"701","台南市東區":"701","臺南市南區":"702","台南市南區":"702","臺南市北區":"704","台南市北區":"704","臺南市安平區":"708","台南市安平區":"708","臺南市安南區":"709","台南市安南區":"709","臺南市永康區":"710","台南市永康區":"710","臺南市歸仁區":"711","台南市歸仁區":"711","臺南市新化區":"712","台南市新化區":"712","臺南市左鎮區":"713","台南市左鎮區":"713","臺南市玉井區":"714","台南市玉井區":"714","臺南市楠西區":"715","台南市楠西區":"715","臺南市南化區":"716","台南市南化區":"716","臺南市仁德區":"717","台南市仁德區":"717","臺南市關廟區":"718","台南市關廟區":"718","臺南市龍崎區":"719","台南市龍崎區":"719","臺南市官田區":"720","台南市官田區":"720","臺南市麻豆區":"721","台南市麻豆區":"721","臺南市佳里區":"722","台南市佳里區":"722","臺南市西港區":"723","台南市西港區":"723","臺南市七股區":"724","台南市七股區":"724","臺南市將軍區":"725","台南市將軍區":"725","臺南市學甲區":"726","台南市學甲區":"726","臺南市北門區":"727","台南市北門區":"727","臺南市新營區":"730","台南市新營區":"730","臺南市後壁區":"731","台南市後壁區":"731","臺南市白河區":"732","台南市白河區":"732","臺南市東山區":"733","台南市東山區":"733","臺南市六甲區":"734","台南市六甲區":"734","臺南市下營區":"735","台南市下營區":"735","臺南市柳營區":"736","台南市柳營區":"736","臺南市鹽水區":"737","台南市鹽水區":"737","臺南市善化區":"741","台南市善化區":"741","臺南市大內區":"742","台南市大內區":"742","臺南市山上區":"743","台南市山上區":"743","臺南市新市區":"744","台南市新市區":"744","臺南市安定區":"745","台南市安定區":"745",
-"高雄市新興區":"800","高雄市前金區":"801","高雄市苓雅區":"802","高雄市鹽埕區":"803","高雄市鼓山區":"804","高雄市旗津區":"805","高雄市前鎮區":"806","高雄市三民區":"807","高雄市楠梓區":"811","高雄市小港區":"812","高雄市左營區":"813","高雄市仁武區":"814","高雄市大社區":"815","高雄市東沙群島":"817","高雄市南沙群島":"819","高雄市岡山區":"820","高雄市路竹區":"821","高雄市阿蓮區":"822","高雄市田寮區":"823","高雄市燕巢區":"824","高雄市橋頭區":"825","高雄市梓官區":"826","高雄市彌陀區":"827","高雄市永安區":"828","高雄市湖內區":"829","高雄市鳳山區":"830","高雄市大寮區":"831","高雄市林園區":"832","高雄市鳥松區":"833","高雄市大樹區":"840","高雄市旗山區":"842","高雄市美濃區":"843","高雄市六龜區":"844","高雄市內門區":"845","高雄市杉林區":"846","高雄市甲仙區":"847","高雄市桃源區":"848","高雄市那瑪夏區":"849","高雄市茂林區":"851","高雄市茄萣區":"852",
-"屏東縣屏東市":"900","屏東縣三地門鄉":"901","屏東縣霧台鄉":"902","屏東縣瑪家鄉":"903","屏東縣九如鄉":"904","屏東縣里港鄉":"905","屏東縣高樹鄉":"906","屏東縣鹽埔鄉":"907","屏東縣長治鄉":"908","屏東縣麟洛鄉":"909","屏東縣竹田鄉":"911","屏東縣內埔鄉":"912","屏東縣萬丹鄉":"913","屏東縣潮州鎮":"920","屏東縣泰武鄉":"921","屏東縣來義鄉":"922","屏東縣萬巒鄉":"923","屏東縣崁頂鄉":"924","屏東縣新埤鄉":"925","屏東縣南州鄉":"926","屏東縣林邊鄉":"927","屏東縣東港鎮":"928","屏東縣琉球鄉":"929","屏東縣佳冬鄉":"931","屏東縣新園鄉":"932","屏東縣枋寮鄉":"940","屏東縣枋山鄉":"941","屏東縣春日鄉":"942","屏東縣獅子鄉":"943","屏東縣車城鄉":"944","屏東縣牡丹鄉":"945","屏東縣恆春鎮":"946","屏東縣滿州鄉":"947",
-"臺東縣臺東市":"950","台東縣台東市":"950","臺東縣綠島鄉":"951","台東縣綠島鄉":"951","臺東縣蘭嶼鄉":"952","台東縣蘭嶼鄉":"952","臺東縣延平鄉":"953","台東縣延平鄉":"953","臺東縣卑南鄉":"954","台東縣卑南鄉":"954","臺東縣鹿野鄉":"955","台東縣鹿野鄉":"955","臺東縣關山鎮":"956","台東縣關山鎮":"956","臺東縣海端鄉":"957","台東縣海端鄉":"957","臺東縣池上鄉":"958","台東縣池上鄉":"958","臺東縣東河鄉":"959","台東縣東河鄉":"959","臺東縣成功鎮":"961","台東縣成功鎮":"961","臺東縣長濱鄉":"962","台東縣長濱鄉":"962","臺東縣太麻里鄉":"963","台東縣太麻里鄉":"963","臺東縣金峰鄉":"964","台東縣金峰鄉":"964","臺東縣大武鄉":"965","台東縣大武鄉":"965","臺東縣達仁鄉":"966","台東縣達仁鄉":"966",
-"花蓮縣花蓮市":"970","花蓮縣新城鄉":"971","花蓮縣秀林鄉":"972","花蓮縣吉安鄉":"973","花蓮縣壽豐鄉":"974","花蓮縣鳳林鎮":"975","花蓮縣光復鄉":"976","花蓮縣豐濱鄉":"977","花蓮縣瑞穗鄉":"978","花蓮縣萬榮鄉":"979","花蓮縣玉里鎮":"981","花蓮縣卓溪鄉":"982","花蓮縣富里鄉":"983",
-"澎湖縣馬公市":"880","澎湖縣西嶼鄉":"881","澎湖縣望安鄉":"882","澎湖縣七美鄉":"883","澎湖縣白沙鄉":"884","澎湖縣湖西鄉":"885",
-"金門縣金沙鎮":"890","金門縣金湖鎮":"891","金門縣金寧鄉":"892","金門縣金城鎮":"893","金門縣烈嶼鄉":"894","金門縣烏坵鄉":"896",
-"連江縣南竿鄉":"209","連江縣北竿鄉":"210","連江縣莒光鄉":"211","連江縣東引鄉":"212"
-};
-
-// 偏遠山區郵遞區號
-var REMOTE_ZIPS = ["336","424","426","546","556","558","605","607","848","849","851","902","903","921","943","945"];
-// 離島郵遞區號
-var ISLAND_ZIPS = ["880","881","882","883","884","885","890","891","892","893","894","896","209","210","211","212","951","952","929"];
-// 台南同市郵遞區號（700 系列）
-function isTainanCity(zip) {
-  if (!zip || zip.length < 3) return false;
-  var z = parseInt(zip.substring(0,3), 10);
-  return z >= 700 && z <= 745;
+function onSenderPostChange() {
+  var sel = document.getElementById('sender-post-select');
+  if (sel) SELECTED_POST_IDX = parseInt(sel.value) || 0;
+  updateShippingBox();
 }
 
-function lookupZip(addr) {
+// 從地址抓 3 碼郵遞區號
+function lookupZip3(addr) {
   if (!addr) return "";
-  var existing = addr.match(/^(\d{3,6})/);
+  var existing = addr.match(/^(\d{3})/);
   if (existing) return existing[1];
+  // 退而求其次：用 TW_ZIPCODES 對照（簡化版）
+  return lookupZip3ByName(addr);
+}
+
+// 從已知的縣市+區名推 3 碼（基礎版）
+function lookupZip3ByName(addr) {
+  // 精簡的區→郵遞區號對照（覆蓋常用）
+  var MAP = {
+    "臺北市中正區":"100","台北市中正區":"100","臺北市大同區":"103","台北市大同區":"103",
+    "臺北市中山區":"104","台北市中山區":"104","臺北市松山區":"105","台北市松山區":"105",
+    "臺北市大安區":"106","台北市大安區":"106","臺北市萬華區":"108","台北市萬華區":"108",
+    "臺北市信義區":"110","台北市信義區":"110","臺北市士林區":"111","台北市士林區":"111",
+    "臺北市北投區":"112","台北市北投區":"112","臺北市內湖區":"114","台北市內湖區":"114",
+    "臺北市南港區":"115","台北市南港區":"115","臺北市文山區":"116","台北市文山區":"116",
+    "基隆市":"200",
+    "新北市板橋區":"220","新北市汐止區":"221","新北市新店區":"231","新北市永和區":"234",
+    "新北市中和區":"235","新北市三重區":"241","新北市新莊區":"242","新北市林口區":"244",
+    "新北市蘆洲區":"247","新北市五股區":"248","新北市淡水區":"251",
+    "桃園市桃園區":"330","桃園市中壢區":"320","桃園市平鎮區":"324",
+    "新竹市":"300","新竹縣竹北市":"302","新竹縣湖口鄉":"303","新竹縣竹東鎮":"310",
+    "臺中市中區":"400","台中市中區":"400","臺中市東區":"401","台中市東區":"401",
+    "臺中市南區":"402","台中市南區":"402","臺中市西區":"403","台中市西區":"403",
+    "臺中市北區":"404","台中市北區":"404","臺中市北屯區":"406","台中市北屯區":"406",
+    "臺中市西屯區":"407","台中市西屯區":"407","臺中市南屯區":"408","台中市南屯區":"408",
+    "彰化縣彰化市":"500","彰化縣鹿港鎮":"505","彰化縣員林市":"510",
+    "南投縣南投市":"540","南投縣草屯鎮":"542",
+    "嘉義市":"600",
+    "臺南市中西區":"700","台南市中西區":"700","臺南市東區":"701","台南市東區":"701",
+    "臺南市南區":"702","台南市南區":"702","臺南市北區":"704","台南市北區":"704",
+    "臺南市安平區":"708","台南市安平區":"708","臺南市安南區":"709","台南市安南區":"709",
+    "臺南市永康區":"710","台南市永康區":"710","臺南市仁德區":"717","台南市仁德區":"717",
+    "高雄市新興區":"800","高雄市前金區":"801","高雄市苓雅區":"802","高雄市鹽埕區":"803",
+    "高雄市鼓山區":"804","高雄市前鎮區":"806","高雄市三民區":"807",
+    "高雄市美濃區":"843"
+  };
   var best = "";
   var bestLen = 0;
-  for (var key in TW_ZIPCODES) {
+  for (var key in MAP) {
     if (addr.indexOf(key) >= 0 && key.length > bestLen) {
-      best = TW_ZIPCODES[key];
-      bestLen = key.length;
+      best = MAP[key]; bestLen = key.length;
     }
   }
   return best;
 }
 
-// 從地址推斷行政區名稱（方便顯示）
+// 嘗試從地址找區名（用於顯示）
 function lookupDistrict(addr) {
   if (!addr) return "";
-  var best = "";
-  var bestLen = 0;
-  for (var key in TW_ZIPCODES) {
-    if (addr.indexOf(key) >= 0 && key.length > bestLen) {
-      best = key;
-      bestLen = key.length;
-    }
-  }
-  return best;
+  // 從地址中直接抓 XX縣/市 + XX區/市/鄉/鎮
+  var m = addr.match(/([\u4e00-\u9fff]+?[縣市])([\u4e00-\u9fff]+?[區市鄉鎮])/);
+  if (m) return m[1] + m[2];
+  return "";
 }
 
 /**
- * 判斷快捷區域類型
- * @returns { zoneType, zoneColor, zoneTitle, postLine, backupLine, district, zip3 }
+ * 核心：判斷快捷區域 + 整合寄件郵局截郵時刻
+ * 從台南 717 寄出的角度：
+ *   - 收件地 L1/L2 (主要都市名單內) → 主要都市間互寄 → 當日到，用 L1 截郵
+ *   - 收件地 L3 (周邊) → 台南不在周邊互寄路線 → 隔日到
+ *   - 收件地 L4 → 隔日
+ *   - 收件地 L5 → 至遲隔日
+ *   - 收件地 L6 → 無快捷，建議改黑貓
+ *   - 收件地 = 717 本地 → 本地互寄
  */
 function getShippingZone(addr) {
-  var zip = lookupZip(addr);
-  var zip3 = zip ? zip.substring(0,3) : "";
-  var district = lookupDistrict(addr);
+  var zip3 = lookupZip3(addr);
+  var district = lookupDistrict(addr) || addr.substring(0, 10);
 
   if (!zip3) {
     return {
-      zoneType: 'unknown', zoneColor: 'gray', zoneTitle: '⚪ 無法判斷地址',
-      postLine: '請手動查詢', backupLine: '', district: '', zip3: ''
+      zoneType: 'unknown', zoneColor: 'gray',
+      zoneTitle: '⚪ 無法辨識地址', postLine: '請手動確認',
+      backupLine: '', canSameDay: false, cutoffKind: null,
+      district: district, zip3: ''
     };
   }
 
-  // 離島
-  if (ISLAND_ZIPS.indexOf(zip3) >= 0) {
+  // 本地互寄（717）
+  if (zip3 === '717') {
     return {
-      zoneType: 'island', zoneColor: 'red',
-      zoneTitle: '🔴 離島 · ' + district,
-      postLine: '郵局 2-3 天到',
-      backupLine: '備援：黑貓 2-3 天（順豐不收）',
+      zoneType: 'local', zoneColor: 'green',
+      zoneTitle: '🟢 本地互寄 · ' + district + ' (717)',
+      postLine: '郵局當日到',
+      backupLine: '',
+      canSameDay: true, cutoffKind: 'local',
       district: district, zip3: zip3
     };
   }
 
-  // 偏遠山區
-  if (REMOTE_ZIPS.indexOf(zip3) >= 0) {
+  // 查對照表
+  var info = POSTAL_ZONES_MAP ? POSTAL_ZONES_MAP[zip3] : null;
+
+  if (!info) {
+    // 不在表裡 → 預設 L4 本島隔日
     return {
-      zoneType: 'remote', zoneColor: 'yellow',
-      zoneTitle: '🟡 偏遠山區 · ' + district,
-      postLine: '郵局 2 天到',
-      backupLine: '備援：黑貓 2 天、順豐 2 天',
+      zoneType: 'normal', zoneColor: 'green',
+      zoneTitle: '🟢 L4 本島 · ' + district + ' (' + zip3 + ')',
+      postLine: '郵局隔日到',
+      backupLine: '備援：黑貓 / 順豐 隔日',
+      canSameDay: false, cutoffKind: null,
       district: district, zip3: zip3
     };
   }
 
-  // 台南同市
-  if (isTainanCity(zip3)) {
-    var now = new Date();
-    var h = now.getHours();
-    var sameDay = h < 10;
+  var level = info.level;
+  var cityDist = info.city + info.district;
+
+  // L1 主要都市 or L2 區域互寄（從 717 寄出，兩者都走「主要都市間互寄」規則 → 11:00 前當日）
+  if (level.indexOf('L1') === 0 || level.indexOf('L2') === 0) {
     return {
-      zoneType: 'tainan', zoneColor: 'green',
-      zoneTitle: '🟢 台南市內同市 · ' + district,
-      postLine: sameDay ? '郵局 10:00 前寄可當日到' : '郵局隔天上午到（已過當日截止）',
-      backupLine: '備援：黑貓隔日',
-      district: district, zip3: zip3
+      zoneType: 'l1', zoneColor: 'green',
+      zoneTitle: '🟢 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '主要都市間互寄 · 當日到',
+      backupLine: '備援：黑貓 / 順豐 隔日',
+      canSameDay: true, cutoffKind: 'l1',
+      district: cityDist, zip3: zip3
     };
   }
 
-  // 本島一般
+  // L3 周邊（台南不在區域互寄路線 → 隔日）
+  if (level.indexOf('L3') === 0) {
+    return {
+      zoneType: 'l3', zoneColor: 'green',
+      zoneTitle: '🟢 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '郵局隔日到（非台南區域互寄路線）',
+      backupLine: '備援：黑貓 / 順豐 隔日',
+      canSameDay: false, cutoffKind: null,
+      district: cityDist, zip3: zip3
+    };
+  }
+
+  // L5 離島
+  if (level.indexOf('L5') === 0) {
+    return {
+      zoneType: 'l5', zoneColor: 'yellow',
+      zoneTitle: '🟡 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '至遲隔日到（天候順延）',
+      backupLine: '備援：黑貓隔日（順豐部分不收）',
+      canSameDay: false, cutoffKind: null,
+      district: cityDist, zip3: zip3
+    };
+  }
+
+  // L6 無快捷
+  if (level.indexOf('L6') === 0) {
+    return {
+      zoneType: 'l6', zoneColor: 'red',
+      zoneTitle: '🔴 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '⚠️ 郵局未開辦快捷，時效不保證',
+      backupLine: '📦 建議改：黑貓 / 順豐',
+      canSameDay: false, cutoffKind: null,
+      district: cityDist, zip3: zip3
+    };
+  }
+
+  // fallback
   return {
     zoneType: 'normal', zoneColor: 'green',
-    zoneTitle: '🟢 本島標準 · ' + district,
-    postLine: '郵局隔天到',
-    backupLine: '備援：黑貓隔日、順豐隔日',
-    district: district, zip3: zip3
+    zoneTitle: '🟢 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
+    postLine: '郵局隔日到',
+    backupLine: '備援：黑貓 / 順豐 隔日',
+    canSameDay: false, cutoffKind: null,
+    district: cityDist, zip3: zip3
   };
 }
 
+// 把 "HH:MM" 轉成總分鐘
+function parseTimeToMin(s) {
+  if (!s || s === '—' || s === 'X' || s === 'x') return -1;
+  var m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return -1;
+  return parseInt(m[1]) * 60 + parseInt(m[2]);
+}
+function minToHHMM(min) {
+  var h = Math.floor(min / 60);
+  var m = min % 60;
+  return h + 'h ' + m + 'm';
+}
+
 /**
- * 時段 + 週末判斷
- * @returns { timeText, timeColor, weekendText (optional) }
+ * 時段 + 週末 + 截止時間整合判斷
+ * 輸入：zone（快捷區域資訊）、post（寄件郵局資訊）
  */
-function getShippingTimeInfo() {
+function getShippingTimeInfo(zone, post) {
   var now = new Date();
-  var dow = now.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+  var dow = now.getDay(); // 0=Sun, 6=Sat
   var h = now.getHours();
   var m = now.getMinutes();
   var totalMin = h * 60 + m;
 
-  var result = { timeText: '', timeColor: 'gray', weekendText: '' };
+  var result = { timeText: '', timeColor: 'gray', weekendText: '', postLine: '' };
 
-  // --- 週末判斷（優先於時段） ---
+  // --- 週末優先判斷 ---
   if (dow === 0) {
-    // 週日
     result.timeText = '📞 今日郵局休息 · 下次郵局寄出：週一';
     result.timeColor = 'gray';
     return result;
   }
   if (dow === 6) {
-    // 週六
     var noon = 12 * 60;
     if (totalMin < noon) {
       var remainMin = noon - totalMin;
-      var rh = Math.floor(remainMin / 60);
-      var rm = remainMin % 60;
-      result.timeText = '📞 黑貓上門：請在 12:00 前完成預約 · 剩 ' + (rh > 0 ? rh + 'h ' : '') + rm + 'm';
+      result.timeText = '📞 黑貓上門：請在 12:00 前完成預約 · 剩 ' + minToHHMM(remainMin);
       result.timeColor = 'purple';
     } else {
       result.timeText = '📞 已過黑貓預約截止 · 下次郵局寄出：週一';
@@ -510,53 +605,78 @@ function getShippingTimeInfo() {
     return result;
   }
   if (dow === 5 && totalMin >= 12 * 60) {
-    // 週五中午 12:00 之後，追加週末提醒（但主時段仍照平日規則）
     result.weekendText = '⚠️ 週末提醒：建議預約黑貓 · 週六 12:00 前完成預約';
   }
 
-  // --- 平日時段 ---
+  // --- 平日：根據 zone.canSameDay + post.cutoff ---
+  var cutoffStr = null;
+  var cutoffLabel = '';
+  if (zone && zone.canSameDay && zone.cutoffKind && post) {
+    if (zone.cutoffKind === 'l1' || zone.cutoffKind === 'l2') {
+      // L1 和 L2 從台南寄出，都走「主要都市間互寄」規則 → 用 L1 截郵時刻
+      cutoffStr = post.cutoffL1;
+      cutoffLabel = '主要都市當日截止';
+    } else if (zone.cutoffKind === 'local') {
+      cutoffStr = post.cutoffLocal;
+      cutoffLabel = '本地互寄當日截止';
+    }
+  }
+
+  var cutoffMin = parseTimeToMin(cutoffStr);
+
+  // 先計算「當日快捷截止」狀態（僅影響 cutoffMissed 標記與頂部訊息）
+  var sameDayCutoffMsg = '';
+  if (cutoffMin > 0) {
+    if (totalMin < cutoffMin) {
+      // 還來得及寄當日快捷 → 不標示 cutoffMissed
+      result.cutoffMissed = false;
+    } else {
+      // 已過當日快捷截止
+      result.cutoffMissed = true;
+      sameDayCutoffMsg = '📦 當日快捷已截止（' + cutoffStr + '）';
+    }
+  }
+
+  // 再依時段判斷「郵局寄件截止」的顏色 + 主要時段提示
+  // 時段規則：
+  //   09:00-14:00 → 🟢 綠 · 今日 17:00 前寄郵局 · 剩 Xh Ym
+  //   14:01-16:00 → 🟡 黃 · 郵局 17:00 前 · 剩 Xh Ym
+  //   16:01-16:30 → 🔴 紅 · 郵局快截止 · 剩 Xm
+  //   16:31-18:30 → 🟣 紫 · 郵局已截止 · 可自送黑貓門市 19:00 前
+  //   18:31 之後 → ⚫ 灰 · 今日結束 · 下次寄出：明日／週一
   var t1400 = 14 * 60;
   var t1600 = 16 * 60;
   var t1630 = 16 * 60 + 30;
   var t1830 = 18 * 60 + 30;
+  var t1700 = 17 * 60;
+  var t1900 = 19 * 60;
 
   if (totalMin < t1400) {
-    // 00:00-14:00 綠
-    var remain = 17 * 60 - totalMin;
-    var rh = Math.floor(remain / 60);
-    var rm = remain % 60;
-    result.timeText = '⏰ 今日 17:00 前寄郵局 · 剩 ' + rh + 'h ' + rm + 'm';
     result.timeColor = 'green';
+    result.timeText = '⏰ 今日 17:00 前寄郵局 · 剩 ' + minToHHMM(t1700 - totalMin);
   } else if (totalMin < t1600) {
-    // 14:01-16:00 黃
-    var remain2 = 17 * 60 - totalMin;
-    var rh2 = Math.floor(remain2 / 60);
-    var rm2 = remain2 % 60;
-    result.timeText = '⏰ 郵局 17:00 前 · 剩 ' + (rh2 > 0 ? rh2 + 'h ' : '') + rm2 + 'm';
     result.timeColor = 'yellow';
+    result.timeText = '⏰ 郵局 17:00 前 · 剩 ' + minToHHMM(t1700 - totalMin);
   } else if (totalMin < t1630) {
-    // 16:01-16:30 紅
-    var remain3 = 17 * 60 - totalMin;
-    result.timeText = '🔴 郵局快截止 · 剩 ' + remain3 + 'm';
     result.timeColor = 'red';
+    result.timeText = '🔴 郵局快截止 · 剩 ' + (t1700 - totalMin) + 'm';
   } else if (totalMin < t1830) {
-    // 16:31-18:30 紫（黑貓備援）
-    var remain4 = 19 * 60 - totalMin;
-    var rh4 = Math.floor(remain4 / 60);
-    var rm4 = remain4 % 60;
-    result.timeText = '📦 郵局已截止 · 可自送黑貓門市 19:00 前（剩 ' + (rh4 > 0 ? rh4 + 'h ' : '') + rm4 + 'm）';
     result.timeColor = 'purple';
+    result.timeText = '📦 郵局已截止 · 可自送黑貓門市 19:00 前（剩 ' + minToHHMM(t1900 - totalMin) + '）';
   } else {
-    // 18:31 後灰
+    result.timeColor = 'gray';
     var nextLabel = (dow === 5) ? '週一' : '明日';
     result.timeText = '⏰ 今日結束 · 下次寄出：' + nextLabel;
-    result.timeColor = 'gray';
+  }
+
+  // 若快捷已截止，把「當日快捷已截止」的訊息塞到 extraText（獨立一行、顯示在時段訊息上方）
+  if (sameDayCutoffMsg) {
+    result.extraText = sameDayCutoffMsg;
   }
 
   return result;
 }
 
-// 取得目前選中的地址字串
 function getCurrentAddress() {
   var sel = document.getElementById('addr-select');
   if (!sel) return '';
@@ -567,25 +687,50 @@ function getCurrentAddress() {
   return '';
 }
 
-// 更新工具頁的快捷色塊
+function getSelectedPost() {
+  return (SENDER_POSTS && SENDER_POSTS.length > 0) ? SENDER_POSTS[SELECTED_POST_IDX] : null;
+}
+
 function updateShippingBox() {
   var container = document.getElementById('shipping-box-container');
   if (!container) return;
 
   var addr = getCurrentAddress();
-  if (!addr) {
-    container.innerHTML = '';
-    return;
-  }
+  if (!addr) { container.innerHTML = ''; return; }
 
   var zone = getShippingZone(addr);
-  var timeInfo = getShippingTimeInfo();
+  var post = getSelectedPost();
+  var timeInfo = getShippingTimeInfo(zone, post);
+
+  // 若當日截止已過 → 把 postLine 改成「隔日到」
+  var effectivePostLine = zone.postLine;
+  var cutoffMissed = timeInfo && timeInfo.cutoffMissed;
+  if (cutoffMissed) {
+    if (zone.cutoffKind === 'local') {
+      effectivePostLine = '已過當日截止 → 郵局隔日到';
+    } else {
+      effectivePostLine = '已過當日截止 → 郵局隔日上午到';
+    }
+  }
 
   var html = '<div class="shipping-box zone-' + zone.zoneColor + '">';
   html += '<div class="sb-title">' + esc(zone.zoneTitle) + '</div>';
-  html += '<div class="sb-row"><span class="sb-k">📬</span><span>' + esc(zone.postLine) + '</span></div>';
+  html += '<div class="sb-row"><span class="sb-k">📬</span><span>' + esc(effectivePostLine) + '</span></div>';
   if (zone.backupLine) {
     html += '<div class="sb-row"><span class="sb-k">📦</span><span>' + esc(zone.backupLine) + '</span></div>';
+  }
+  if (post && zone.canSameDay && !cutoffMissed) {
+    // 只在「還來得及」時顯示當日截郵時刻
+    var cutoff = '';
+    if (zone.cutoffKind === 'l1' || zone.cutoffKind === 'l2') cutoff = post.cutoffL1;
+    else if (zone.cutoffKind === 'local') cutoff = post.cutoffLocal;
+    if (cutoff) {
+      html += '<div class="sb-post">🏤 ' + esc(post.shortName) + '郵局 · ' + esc(cutoff) + ' 前交寄當日到</div>';
+    }
+  }
+  if (timeInfo.extraText) {
+    // 「當日快捷已截止」訊息放在時段前面，更醒目
+    html += '<div class="sb-time" style="color:#6a1b9a;font-weight:700;">' + esc(timeInfo.extraText) + '</div>';
   }
   if (timeInfo.timeText) {
     html += '<div class="sb-time t-' + timeInfo.timeColor + '">' + esc(timeInfo.timeText) + '</div>';
@@ -607,9 +752,7 @@ function switchView(view) {
   var btnList = document.getElementById("btn-list");
   if (btnCard) btnCard.className = view === "card" ? "active" : "";
   if (btnList) btnList.className = view === "list" ? "active" : "";
-  if (currentProducts && currentProducts.length > 0) {
-    renderProductArea(currentProducts);
-  }
+  if (currentProducts && currentProducts.length > 0) renderProductArea(currentProducts);
 }
 
 function renderProductArea(products) {
@@ -617,11 +760,6 @@ function renderProductArea(products) {
   var area = document.getElementById("product-area");
   if (!area) return;
   if (!products || products.length === 0) { area.innerHTML = '<div class="status">無商品資料</div>'; return; }
-
-  var giftProducts = [];
-  if (currentTask && currentTask._gifts && currentTask._gifts.length > 0) {
-    currentTask._gifts.forEach(function(g) { giftProducts.push({ name: g.name, qty: g.qty, isGift: true }); });
-  }
 
   if (currentView === "card") {
     var html = '<div class="product-grid">';
@@ -632,17 +770,10 @@ function renderProductArea(products) {
         html += '<div class="p-body"><div class="p-name">' + esc(p.name) + '</div>';
         html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(p.qty) + '</div></div>';
       } else {
-        if (p.img) {
-          html += '<img src="' + p.img + '" alt="">';
-        } else {
-          html += '<div class="no-img" id="img-placeholder-' + idx + '"><span class="spinner"></span></div>';
-        }
-        html += '<div class="p-name">' + esc(p.name) + '</div>';
-        html += '<div class="p-meta">';
-        html += 'SKU：' + esc(p.sku || '-') + '<br>';
-        html += '📍 ' + esc(p.loc || '-') + '<br>';
-        html += '數量：' + esc(p.qty);
-        html += '</div>';
+        if (p.img) html += '<img src="' + p.img + '" alt="">';
+        else html += '<div class="no-img">無圖</div>';
+        html += '<div class="p-body"><div class="p-name">' + esc(p.name) + '</div>';
+        html += '<div class="p-meta">SKU：' + esc(p.sku || '-') + '<br>📍 ' + esc(p.loc || '-') + '<br>數量：' + esc(p.qty) + '</div></div>';
       }
       html += '</div>';
     });
@@ -674,11 +805,8 @@ function renderProductArea(products) {
         html += '<div class="no-img">新商品</div>';
         html += '<div class="p-info"><div class="p-name">' + esc(p.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(p.qty) + '</div></div>';
       } else {
-        if (p.img) {
-          html += '<img src="' + p.img + '" alt="">';
-        } else {
-          html += '<div class="no-img" id="img-placeholder-' + idx + '"><span class="spinner"></span></div>';
-        }
+        if (p.img) html += '<img src="' + p.img + '" alt="">';
+        else html += '<div class="no-img">無圖</div>';
         html += '<div class="p-info">';
         html += '<div class="p-name">' + esc(p.name) + '</div>';
         html += '<div class="p-meta">SKU：' + esc(p.sku || '-') + '　📍 ' + esc(p.loc || '-') + '　數量：' + esc(p.qty) + '</div>';
@@ -711,11 +839,7 @@ function renderProductArea(products) {
 function countItems(text) {
   var total = 0;
   var matches = text.match(/\*(\d+)/g);
-  if (matches) {
-    matches.forEach(function(m) {
-      total += parseInt(m.replace("*",""));
-    });
-  }
+  if (matches) matches.forEach(function(m) { total += parseInt(m.replace("*","")); });
   return total;
 }
 
@@ -724,9 +848,8 @@ function doPrint() {
   var addrText = "";
   if (sel) {
     var selVal = sel.value;
-    if (selVal === "desc") {
-      addrText = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
-    } else {
+    if (selVal === "desc") addrText = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
+    else {
       var idx = parseInt(selVal);
       addrText = (!isNaN(idx) && currentAddresses[idx]) ? currentAddresses[idx].address : "";
     }
@@ -734,7 +857,6 @@ function doPrint() {
   var finalName = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
   var finalPhone = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
   var dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
-
   var fieldTitle = document.getElementById("field-title") ? document.getElementById("field-title").value : currentTask.title;
   var itemTextVal = document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText;
   var totalCount = countItems(itemTextVal);
@@ -747,6 +869,9 @@ function doPrint() {
   var shippingBanner = '';
   if (addrText && !currentTask.isNanbanPickup) {
     var zone = getShippingZone(addrText);
+    var post = getSelectedPost();
+    var printTimeInfo = getShippingTimeInfo(zone, post);
+    var printCutoffMissed = printTimeInfo && printTimeInfo.cutoffMissed;
     var bannerColors = {
       green:  { bg: '#e8f5e9', bd: '#81c784', fg: '#1b5e20' },
       yellow: { bg: '#fff8e1', bd: '#ffb74d', fg: '#e65100' },
@@ -754,11 +879,21 @@ function doPrint() {
       gray:   { bg: '#eceff1', bd: '#b0bec5', fg: '#37474f' }
     };
     var c = bannerColors[zone.zoneColor] || bannerColors.gray;
+    var rightText = zone.postLine;
+    if (printCutoffMissed) {
+      // 已過當日截止 → 改顯示隔日到
+      rightText = (zone.cutoffKind === 'local') ? '已過當日截止 → 郵局隔日到' : '已過當日截止 → 郵局隔日上午到';
+    } else if (post && zone.canSameDay) {
+      var cutoff = '';
+      if (zone.cutoffKind === 'l1' || zone.cutoffKind === 'l2') cutoff = post.cutoffL1;
+      else if (zone.cutoffKind === 'local') cutoff = post.cutoffLocal;
+      if (cutoff) rightText += '（' + post.shortName + ' ' + cutoff + ' 前）';
+    }
     shippingBanner = "<div style='background:" + c.bg + ";border:1.5px solid " + c.bd + ";color:" + c.fg + ";"
       + "padding:6px 10px;border-radius:4px;font-size:11pt;font-weight:600;margin-bottom:10px;"
-      + "display:flex;justify-content:space-between;align-items:center;'>"
+      + "display:flex;justify-content:space-between;align-items:center;gap:10px;'>"
       + "<span>" + esc(zone.zoneTitle) + "</span>"
-      + "<span style='font-size:10pt;font-weight:500;'>" + esc(zone.postLine) + "</span>"
+      + "<span style='font-size:10pt;font-weight:500;'>" + esc(rightText) + "</span>"
       + "</div>";
   }
 
@@ -802,7 +937,6 @@ function doPrint() {
     + "<tr><td class='lbl'>標題：</td><td class='val' style='font-weight:600;font-size:12pt;' colspan='3'>" + esc(fieldTitle) + "</td></tr>"
     + "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td><td class='lbl' style='padding-left:6px;'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
     + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>"
-    + (currentTask.isNanbanPickup ? "" : "")
     + "<tr><td class='lbl'>商品數：</td><td class='val'>" + totalCount + " 件</td><td class='lbl' style='padding-left:6px;'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td></tr>"
     + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val'></td><td class='lbl' style='padding-left:6px;color:#c00;font-weight:700;'>" + esc(currentTask._payment||"") + "</td><td class='val'></td></tr>"
     + "</table>"
@@ -819,11 +953,8 @@ function doPrint() {
       html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;'>";
       products.forEach(function(p) {
         html += "<div style='border:1px solid #eee;border-radius:6px;padding:8px;display:flex;gap:8px;align-items:flex-start;'>";
-        if (p.img) {
-          html += "<img src='" + p.img + "' style='width:" + cardImgSize + "px;height:" + cardImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
-        } else {
-          html += "<div style='width:" + cardImgSize + "px;height:" + cardImgSize + "px;background:#f5f5f5;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#aaa;'>" + (p.isNew ? "新商品" : "無圖") + "</div>";
-        }
+        if (p.img) html += "<img src='" + p.img + "' style='width:" + cardImgSize + "px;height:" + cardImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
+        else html += "<div style='width:" + cardImgSize + "px;height:" + cardImgSize + "px;background:#f5f5f5;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#aaa;'>" + (p.isNew ? "新商品" : "無圖") + "</div>";
         html += "<div style='flex:1;'>";
         html += "<div style='font-size:" + cardFontMd + "pt;font-weight:600;margin-bottom:3px;'>" + esc(p.name) + "</div>";
         if (p.isNew) {
@@ -840,11 +971,8 @@ function doPrint() {
       html += "<div style='margin-top:8px;'>";
       products.forEach(function(p) {
         html += "<div style='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee;'>";
-        if (p.img) {
-          html += "<img src='" + p.img + "' style='width:" + listImgSize + "px;height:" + listImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
-        } else {
-          html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#f5f5f5;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#aaa;'>" + (p.isNew ? "新商品" : "無圖") + "</div>";
-        }
+        if (p.img) html += "<img src='" + p.img + "' style='width:" + listImgSize + "px;height:" + listImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
+        else html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#f5f5f5;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#aaa;'>" + (p.isNew ? "新商品" : "無圖") + "</div>";
         html += "<div style='flex:1;'>";
         html += "<div style='font-size:" + cardFontMd + "pt;font-weight:600;'>" + esc(p.name) + "</div>";
         if (p.isNew) {
@@ -878,15 +1006,13 @@ function doPrint() {
   var recvName2 = document.getElementById("field-name") ? document.getElementById("field-name").value : "";
   var recvPhone2 = document.getElementById("field-phone") ? document.getElementById("field-phone").value : "";
   var recvAddr2 = addrText;
-  var recvZip2 = lookupZip(recvAddr2);
+  var recvZip2 = lookupZip3(recvAddr2) || "";
   var recvAddrClean2 = recvAddr2.replace(/^\d{3,6}/, "").trim();
   var senderZip2 = "717";
 
   function zipBoxes2(zip, count) {
     var boxes = "";
-    for (var i = 0; i < count; i++) {
-      boxes += "<td>" + (zip[i]||"") + "</td>";
-    }
+    for (var i = 0; i < count; i++) boxes += "<td>" + (zip[i]||"") + "</td>";
     return boxes;
   }
 
@@ -921,11 +1047,9 @@ function doPrint() {
     + "</div>";
 
   var printBody = page1HTML + page2HTML;
-
   var win = window.open("", "_blank", "width=800,height=700");
   win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>出貨單</title><style>" + printCSS + "</style></head><body>" + printBody + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");
   win.document.close();
-
 }
 
 function backToSearch() {

@@ -565,19 +565,71 @@ function lookupDistrict(addr) {
 }
 
 /**
- * 檢查地址是否命中除外街道清單
+ * 地址正規化：避免因「3段 vs 三段」「臺 vs 台」「全形/半形」導致街道比對失準
+ *   - 全形數字 → 半形
+ *   - 中文數字 + 段/街/路 → 阿拉伯數字 + 段/街/路
+ *   - 十X段、十段 → 10~19段
+ *   - 臺 → 台
+ *   - 空白、零寬字元清除
+ */
+function normalizeAddress(s) {
+  if (!s) return '';
+  s = String(s);
+  try { s = s.normalize('NFC'); } catch(e) {}
+  // 先清空白、零寬字元（避免「三 段」這類切斷正則匹配）
+  s = s.replace(/[\s\u3000]+/g, '');
+  s = s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '');
+  // 全形數字 → 半形
+  s = s.replace(/[\uFF10-\uFF19]/g, function(c) {
+    return String.fromCharCode(c.charCodeAt(0) - 0xFEE0);
+  });
+  // 中文數字 + 段/街/路
+  var cnMap = {'一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9'};
+  s = s.replace(/十([一二三四五六七八九])(段|街|路)/g, function(m, num, suffix) {
+    return '1' + cnMap[num] + suffix;
+  });
+  s = s.replace(/十(段|街|路)/g, '10$1');
+  s = s.replace(/([一二三四五六七八九])(段|街|路)/g, function(m, num, suffix) {
+    return cnMap[num] + suffix;
+  });
+  // 臺 → 台
+  s = s.replace(/臺/g, '台');
+  return s;
+}
+
+/**
+ * 檢查地址是否命中除外街道清單（黑名單）
  * @param {string} addr - 收件地址
  * @param {string[]} unservicedStreets - 除外街道清單
- * @returns {string|null} 命中時回傳街道名，否則回傳 null
+ * @returns {string|null} 命中時回傳街道原始名，否則回傳 null
  */
 function checkUnservicedStreet(addr, unservicedStreets) {
   if (!addr || !unservicedStreets || unservicedStreets.length === 0) return null;
+  var normAddr = normalizeAddress(addr);
   for (var i = 0; i < unservicedStreets.length; i++) {
     var street = unservicedStreets[i];
     if (!street) continue;
-    if (addr.indexOf(street) >= 0) return street;
+    if (normAddr.indexOf(normalizeAddress(street)) >= 0) return street;
   }
   return null;
+}
+
+/**
+ * 檢查地址是否在「開辦街道白名單」內（反向邏輯區用）
+ * @param {string} addr - 收件地址
+ * @param {string[]} servicedStreets - 開辦街道清單
+ * @returns {boolean|null} true=在白名單、false=不在、null=無設定白名單
+ */
+function checkServicedStreet(addr, servicedStreets) {
+  if (!servicedStreets || servicedStreets.length === 0) return null;
+  if (!addr) return false;
+  var normAddr = normalizeAddress(addr);
+  for (var i = 0; i < servicedStreets.length; i++) {
+    var street = servicedStreets[i];
+    if (!street) continue;
+    if (normAddr.indexOf(normalizeAddress(street)) >= 0) return true;
+  }
+  return false;
 }
 
 /**
@@ -633,8 +685,29 @@ function getShippingZone(addr) {
   var level = info.level;
   var cityDist = info.city + info.district;
   var unservicedStreets = info.unservicedStreets || [];
+  var servicedStreets = info.servicedStreets || [];
+  var hasPartialWarning = !!info.hasPartialWarning;
+  // 給後面所有 branch 用：部分未開辦但無街道清單可比對時的軟警示
+  var partialWarningSuffix = hasPartialWarning ? '｜⚠️ 部分里未開辦，請人工確認' : '';
 
-  // 【核心】先檢查地址是否在除外街道清單 → 命中就降級為紅色警示
+  // 【反向邏輯區】有白名單就先檢查白名單（宜蘭 261/262/270、屏東 946 恆春）
+  // 只有地址命中白名單才算有開辦快捷
+  if (servicedStreets.length > 0) {
+    var inWhitelist = checkServicedStreet(addr, servicedStreets);
+    if (!inWhitelist) {
+      return {
+        zoneType: 'unserviced', zoneColor: 'red',
+        zoneTitle: '❌ 此區僅部分街道開辦快捷 · ' + cityDist + ' (' + zip3 + ')',
+        postLine: '⚠️ 收件地不在此區開辦清單內，時效不保證',
+        backupLine: '📦 強烈建議改：黑貓 / 順豐',
+        canSameDay: false, cutoffKind: null,
+        district: cityDist, zip3: zip3
+      };
+    }
+    // 命中白名單 → 繼續往下跑正常 level 判斷
+  }
+
+  // 【核心】檢查地址是否在除外街道黑名單 → 命中就降級為紅色警示
   var matchedStreet = checkUnservicedStreet(addr, unservicedStreets);
   if (matchedStreet) {
     return {
@@ -651,9 +724,9 @@ function getShippingZone(addr) {
   // L1 主要都市 or L2 區域互寄（從 717 寄出，兩者都走「主要都市間互寄」規則 → 11:00 前當日）
   if (level.indexOf('L1') === 0 || level.indexOf('L2') === 0) {
     return {
-      zoneType: 'l1', zoneColor: 'green',
-      zoneTitle: '🟢 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
-      postLine: '主要都市間互寄 · 當日到',
+      zoneType: 'l1', zoneColor: hasPartialWarning ? 'yellow' : 'green',
+      zoneTitle: (hasPartialWarning ? '🟡 ' : '🟢 ') + level + ' · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '主要都市間互寄 · 當日到' + partialWarningSuffix,
       backupLine: '備援：黑貓 / 順豐 隔日',
       canSameDay: true, cutoffKind: 'l1',
       district: cityDist, zip3: zip3
@@ -664,10 +737,11 @@ function getShippingZone(addr) {
   if (level.indexOf('L3') === 0) {
     // 若此區註記了「部分未開辦」但地址沒命中 → 提示還是要留意
     var hasUnservFlag = unservicedStreets.length > 0;
+    var l3Suffix = (hasUnservFlag ? '｜⚠️ 注意部分街道' : '') + partialWarningSuffix;
     return {
-      zoneType: 'l3', zoneColor: 'green',
-      zoneTitle: '🟢 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
-      postLine: '郵局隔日到（非台南區域互寄路線）' + (hasUnservFlag ? '｜⚠️ 注意部分街道' : ''),
+      zoneType: 'l3', zoneColor: hasPartialWarning ? 'yellow' : 'green',
+      zoneTitle: (hasPartialWarning ? '🟡 ' : '🟢 ') + level + ' · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '郵局隔日到（非台南區域互寄路線）' + l3Suffix,
       backupLine: '備援：黑貓 / 順豐 隔日',
       canSameDay: false, cutoffKind: null,
       district: cityDist, zip3: zip3
@@ -677,10 +751,11 @@ function getShippingZone(addr) {
   // L7 有快捷但非主要都市（隔日到）
   if (level.indexOf('L7') === 0) {
     var hasUnservFlag2 = unservicedStreets.length > 0;
+    var l7Suffix = (hasUnservFlag2 ? '｜⚠️ 注意部分街道' : '') + partialWarningSuffix;
     return {
-      zoneType: 'l7', zoneColor: 'green',
-      zoneTitle: '🟢 ' + level + ' · ' + cityDist + ' (' + zip3 + ')',
-      postLine: '有快捷投遞 · 隔日到' + (hasUnservFlag2 ? '｜⚠️ 注意部分街道' : ''),
+      zoneType: 'l7', zoneColor: hasPartialWarning ? 'yellow' : 'green',
+      zoneTitle: (hasPartialWarning ? '🟡 ' : '🟢 ') + level + ' · ' + cityDist + ' (' + zip3 + ')',
+      postLine: '有快捷投遞 · 隔日到' + l7Suffix,
       backupLine: '備援：黑貓 / 順豐 隔日',
       canSameDay: false, cutoffKind: null,
       district: cityDist, zip3: zip3

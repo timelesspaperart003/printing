@@ -230,14 +230,19 @@ async function loadDetail(pageId) {
         var a = document.getElementById("product-area");
         if (a) a.innerHTML = '<div class="status error">商品資料載入失敗</div>';
       });
+    } else {
+      // 沒解析到任何商品 → 清掉 loader，提示使用者
+      var a = document.getElementById("product-area");
+      if (a) a.innerHTML = '<div class="status">解析不到商品，請檢查商品內容格式（需含 *數字 標示數量）</div>';
     }
   } catch(e) {
     detailEl.innerHTML = '<div class="status error">載入失敗：' + e.message + '</div>';
   }
 }
 
-// [v3.1] 新邏輯：切點從 V/v/已備好 改成 *數字 後面
+// [v3.2] 新邏輯：切點從 V/v/已備好 改成 *數字 後面
 // 範例：「紙紮貓屋 *3 已備好 V3」 → 「紙紮貓屋 *3」
+// 容許 `* 1`（星號後有空格）的寫法
 // 沒有 *數字 的行（備註、需收款…）原樣保留
 function cleanItemText(text) {
   if (!text) return "";
@@ -245,7 +250,7 @@ function cleanItemText(text) {
   var result = [];
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
-    var m = line.match(/\*\d+/);
+    var m = line.match(/\*\s*\d+/);
     if (m) {
       var trimmed = line.substring(0, m.index + m[0].length).trim();
       if (trimmed) result.push(trimmed);
@@ -260,6 +265,7 @@ function cleanItemText(text) {
 //   - 切點從 V/v/已備好 改成 *數字 後面
 //   - 加「贈品模式」：遇到 `贈` 開頭的行就進入贈品模式，後續 *N 行都算贈品
 //   - 修掉 `贈：` 獨佔一行會 push 空贈品的 bug
+//   - 容許 `* 1`（星號後有空格）的寫法
 function parseItemText(text) {
   if (!text) return { items: [], gifts: [], notes: [], payment: "" };
   var lines = text.split("\n");
@@ -269,7 +275,7 @@ function parseItemText(text) {
     var line = lines[i].trim();
     if (!line) continue;
     // 有 *數字 → 切到 *數字結尾
-    var qtyMatch = line.match(/\*\d+/);
+    var qtyMatch = line.match(/\*\s*\d+/);
     if (qtyMatch) {
       line = line.substring(0, qtyMatch.index + qtyMatch[0].length).trim();
     }
@@ -286,7 +292,7 @@ function parseItemText(text) {
       var giftName = line.replace(/^贈[：:：]?\s*/, "").trim();
       if (giftName) {
         // 同一行已有贈品商品
-        var giftQtyMatch = giftName.match(/^(.+?)\s*\*(\d+)\s*$/);
+        var giftQtyMatch = giftName.match(/^(.+?)\s*\*\s*(\d+)\s*$/);
         if (giftQtyMatch) gifts.push({ name: giftQtyMatch[1].trim(), qty: giftQtyMatch[2] });
         else gifts.push({ name: giftName, qty: "1" });
       }
@@ -295,8 +301,8 @@ function parseItemText(text) {
     }
     // 贈品模式中：*N 行算贈品、其他行當備註
     if (inGiftMode) {
-      if (/\*\d+/.test(line)) {
-        var gm = line.match(/^(.+?)\s*\*(\d+)\s*$/);
+      if (/\*\s*\d+/.test(line)) {
+        var gm = line.match(/^(.+?)\s*\*\s*(\d+)\s*$/);
         if (gm) gifts.push({ name: gm[1].trim(), qty: gm[2] });
         else gifts.push({ name: line, qty: "1" });
       } else {
@@ -305,8 +311,8 @@ function parseItemText(text) {
       continue;
     }
     // 一般商品
-    if (/\*\d+/.test(line)) {
-      var m = line.match(/^(.+?)\s*\*(\d+)\s*$/);
+    if (/\*\s*\d+/.test(line)) {
+      var m = line.match(/^(.+?)\s*\*\s*(\d+)\s*$/);
       if (m) items.push({ name: m[1].trim(), qty: m[2] });
       else items.push({ name: line, qty: "1" });
       continue;
@@ -1116,9 +1122,101 @@ function renderProductArea(products) {
 
 function countItems(text) {
   var total = 0;
-  var matches = text.match(/\*(\d+)/g);
-  if (matches) matches.forEach(function(m) { total += parseInt(m.replace("*","")); });
+  var matches = text.match(/\*\s*(\d+)/g);
+  if (matches) matches.forEach(function(m) { total += parseInt(m.replace(/[\*\s]/g, "")); });
   return total;
+}
+
+// ==========================================================
+// 代收貨款相關工具函式
+// ==========================================================
+
+/**
+ * 數字 → 國字大寫（含「元整」）
+ * 2950 → 「貳仟玖佰伍拾元整」
+ * 10500 → 「壹萬零伍佰元整」
+ */
+function numToChineseUppercase(num) {
+  if (num === null || num === undefined || isNaN(num) || num < 0) return '';
+  var n = Math.floor(num);
+  if (n === 0) return '零元整';
+  var digits = ['零','壹','貳','參','肆','伍','陸','柒','捌','玖'];
+  var units  = ['元','拾','佰','仟','萬','拾萬','佰萬','仟萬','億','拾億','佰億'];
+  var s = String(n);
+  if (s.length > units.length) return String(n); // 超出範圍直接回數字
+  var result = '';
+  for (var i = 0; i < s.length; i++) {
+    var d = parseInt(s[i]);
+    var u = units[s.length - 1 - i];
+    if (d === 0) {
+      if (i < s.length - 1 && result && result.charAt(result.length - 1) !== '零') {
+        result += '零';
+      }
+    } else {
+      result += digits[d] + u;
+    }
+  }
+  result = result.replace(/零+$/, '');
+  if (!/元$/.test(result)) result += '元';
+  return result + '整';
+}
+
+/**
+ * 分析備註的 payment 文字 → 回傳類別與金額
+ *   type:
+ *     'free'     → 免收款（普通模板）
+ *     'cod_auto' → 到付/貨到付款（自動走代收貨款模板）
+ *     'cod_ask'  → 需收款/尾款/$ 等（需詢問人員）
+ *     'none'     → 偵測不到
+ */
+function classifyPayment(paymentText) {
+  if (!paymentText) return { type: 'none', amount: null, label: '', raw: '' };
+  var text = String(paymentText);
+  // 抓金額：支援 $2950 / NT$2,950 / 2950元 / $ 2950
+  var amount = null;
+  var patterns = [
+    /\$\s*([\d,]+)/,
+    /(?:NT|新台幣|台幣)\s*\$?\s*([\d,]+)/,
+    /([\d,]+)\s*元/
+  ];
+  for (var i = 0; i < patterns.length; i++) {
+    var m = text.match(patterns[i]);
+    if (m) {
+      var a = parseInt(m[1].replace(/,/g, ''), 10);
+      if (!isNaN(a) && a > 0) { amount = a; break; }
+    }
+  }
+  if (/免收款/.test(text)) {
+    return { type: 'free', amount: 0, label: '免收款', raw: text };
+  }
+  if (/貨到付款|到付/.test(text)) {
+    return { type: 'cod_auto', amount: amount, label: '代收貨款', raw: text };
+  }
+  if (/需收款|需收/.test(text)) {
+    return { type: 'cod_ask', amount: amount, label: '需收款', raw: text };
+  }
+  if (/尾款/.test(text)) {
+    return { type: 'cod_ask', amount: amount, label: '尾款', raw: text };
+  }
+  if (/\$/.test(text) && amount) {
+    return { type: 'cod_ask', amount: amount, label: '代收', raw: text };
+  }
+  return { type: 'none', amount: amount, label: '', raw: text };
+}
+
+/**
+ * 根據 pinfo 和「是否走 COD 模板」產出款項欄顯示文字
+ */
+function formatPaymentCell(pinfo, useCod) {
+  if (!pinfo || pinfo.type === 'none') return pinfo && pinfo.raw ? pinfo.raw : '';
+  if (pinfo.type === 'free') return '免收款';
+  if (useCod) {
+    return '代收貨款 ' + (pinfo.amount ? '$' + pinfo.amount : '（金額待填）');
+  }
+  // 非 COD：顯示類別 + 金額
+  var parts = [pinfo.label];
+  if (pinfo.amount) parts.push('$' + pinfo.amount);
+  return parts.join(' ');
 }
 
 function doPrint() {
@@ -1143,37 +1241,28 @@ function doPrint() {
   staffBoxes.forEach(function(b){ staffChecked.push(b.value); });
   var staffText = staffChecked.length > 0 ? staffChecked.join('、') : '';
 
-  // 列印頁色標（精簡版）
-  var shippingBanner = '';
-  if (addrText && !currentTask.isNanbanPickup) {
-    var zone = getShippingZone(addrText);
-    var post = getSelectedPost();
-    var printTimeInfo = getShippingTimeInfo(zone, post);
-    var printCutoffMissed = printTimeInfo && printTimeInfo.cutoffMissed;
-    var bannerColors = {
-      green:  { bg: '#e8f5e9', bd: '#81c784', fg: '#1b5e20' },
-      yellow: { bg: '#fff8e1', bd: '#ffb74d', fg: '#e65100' },
-      red:    { bg: '#ffebee', bd: '#e57373', fg: '#b71c1c' },
-      gray:   { bg: '#eceff1', bd: '#b0bec5', fg: '#37474f' }
-    };
-    var c = bannerColors[zone.zoneColor] || bannerColors.gray;
-    var rightText = zone.postLine;
-    if (printCutoffMissed) {
-      // 已過當日截止 → 改顯示隔日到
-      rightText = (zone.cutoffKind === 'local') ? '已過當日截止 → 郵局隔日到' : '已過當日截止 → 郵局隔日上午到';
-    } else if (post && zone.canSameDay) {
-      var cutoff = '';
-      if (zone.cutoffKind === 'l1' || zone.cutoffKind === 'l2') cutoff = post.cutoffL1;
-      else if (zone.cutoffKind === 'local') cutoff = post.cutoffLocal;
-      if (cutoff) rightText += '（' + post.shortName + ' ' + cutoff + ' 前）';
-    }
-    shippingBanner = "<div style='background:" + c.bg + ";border:1.5px solid " + c.bd + ";color:" + c.fg + ";"
-      + "padding:6px 10px;border-radius:4px;font-size:11pt;font-weight:600;margin-bottom:10px;"
-      + "display:flex;justify-content:space-between;align-items:center;gap:10px;'>"
-      + "<span>" + esc(zone.zoneTitle) + "</span>"
-      + "<span style='font-size:10pt;font-weight:500;'>" + esc(rightText) + "</span>"
-      + "</div>";
+  // ======= 代收貨款判斷 =======
+  var paymentText = currentTask._payment || '';
+  var pinfo = classifyPayment(paymentText);
+  var useCod = false;  // 是否走代收貨款模板
+  if (pinfo.type === 'cod_auto') {
+    useCod = true;
+  } else if (pinfo.type === 'cod_ask') {
+    var askMsg = '偵測到可能的代收款項：「' + pinfo.raw + '」\n'
+      + (pinfo.amount ? '金額：$' + pinfo.amount + '\n' : '金額：未偵測到\n')
+      + '\n確定 = 使用代收貨款運送單\n取消 = 使用一般運送單';
+    useCod = confirm(askMsg);
   }
+  // 若要 COD 但沒金額 → 詢問是否仍要列印
+  if (useCod && !pinfo.amount) {
+    var askBlank = confirm('⚠️ 無法偵測金額。\n\n確定 = 仍要列印（金額留白讓人員手填）\n取消 = 取消列印');
+    if (!askBlank) return;
+  }
+  // 款項欄文字
+  var paymentCellText = formatPaymentCell(pinfo, useCod);
+
+  // 列印頁不顯示郵局訊息（使用者要求）
+  var shippingBanner = '';
 
   var p1FontSize = document.getElementById("p1-size") ? parseInt(document.getElementById("p1-size").value) : 20;
   var cardScale = document.getElementById("card-size") ? parseFloat(document.getElementById("card-size").value) / 100 : 1;
@@ -1216,7 +1305,8 @@ function doPrint() {
     + "<tr><td class='lbl'>收件姓名：</td><td class='val'>" + esc(finalName) + "</td><td class='lbl' style='padding-left:6px;'>電話：</td><td class='val'>" + esc(finalPhone) + "</td></tr>"
     + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>"
     + "<tr><td class='lbl'>商品數：</td><td class='val'>" + totalCount + " 件</td><td class='lbl' style='padding-left:6px;'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td></tr>"
-    + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val'></td><td class='lbl' style='padding-left:6px;color:#c00;font-weight:700;'>" + esc(currentTask._payment||"") + "</td><td class='val'></td></tr>"
+    + "<tr><td class='lbl'>備註：</td><td class='val' colspan='3' style='color:#444;'>" + esc((currentTask._notes && currentTask._notes.length > 0) ? currentTask._notes.join('　') : '') + "</td></tr>"
+    + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val'></td><td class='lbl' style='padding-left:6px;color:#c00;font-weight:700;'>款項：</td><td class='val' style='color:#c00;font-weight:700;'>" + esc(paymentCellText) + "</td></tr>"
     + "</table>"
     + "<hr class='dashed'>"
     + "<div class='items-label'>商品內容</div>"
@@ -1282,9 +1372,7 @@ function doPrint() {
       });
       html += "</div>";
     }
-    if (currentTask._notes && currentTask._notes.length > 0) {
-      html += "<div style='margin-top:6px;font-size:" + cardFontSm + "pt;color:#666;'><span style='font-weight:600;'>備註：</span>" + currentTask._notes.map(function(n){return esc(n);}).join('　') + "</div>";
-    }
+    // 備註已移到 info-table，此處不再重複
     return html;
   })()
     + "</div>";
@@ -1304,33 +1392,85 @@ function doPrint() {
 
   var p2FontSize = document.getElementById('p2-size') ? parseInt(document.getElementById('p2-size').value) : 14;
   var p2s = p2FontSize;
-  var page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
-    + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;font-size:" + p2s + "pt;'>"
-    + "<div class='post-corner' style='font-size:" + Math.round(p2s*0.7) + "pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
-    + "<div>"
-    + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
-    + "<table class='zip-table' style='margin-left:3mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
-    + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
-    + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>姓名：<span class='post-line' style='min-width:40mm;'>雋永紙藝</span>"
-    + "<span style='margin-left:5mm;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
-    + "</div>"
-    + "<div class='post-divider'></div>"
-    + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"
-    + "<div class='post-row'><table class='zip-table' style='transform:scale(" + (p2s/10).toFixed(1) + ");transform-origin:left center;margin:2mm 0 " + Math.round(p2s*0.5) + "mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
-    + "<div class='post-row' style='margin-top:2mm;align-items:flex-start;'>"
-    + "<span class='recv-label' style='font-size:" + Math.round(p2s*1.6) + "pt;margin-right:4mm;'>收件人</span>"
-    + "<div style='flex:1;'>"
-    + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:" + Math.round(p2s*0.3) + "mm;'>地址：<span class='post-line' style='flex:1;'>" + esc(recvAddrClean2) + "</span></div>"
-    + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:" + Math.round(p2s*0.3) + "mm;'>姓名：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.4) + "pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
-    + "<div class='post-row' style='font-size:" + p2s + "pt;'>電話：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.2) + "pt;'>" + esc(recvPhone2) + "</span></div>"
-    + "</div></div>"
-    + "</div>"
-    + "<div class='post-divider'></div>"
-    + "<div style='font-size:" + Math.round(p2s*0.75) + "pt;color:#555;line-height:1.8;'>"
-    + "<div>內容物：紙藝品　　無法投遞處理方式：退回寄件人</div>"
-    + "</div>"
-    + "</div>"
-    + "</div>";
+
+  var page2HTML;
+  if (useCod) {
+    // ============ 代收貨款運送單 ============
+    var codAmountChinese = pinfo.amount ? numToChineseUppercase(pinfo.amount) : '_________________元整';
+    var codAmountArabic = pinfo.amount ? ('$' + pinfo.amount) : '$________';
+    page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
+      + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;font-size:" + p2s + "pt;'>"
+      + "<div class='post-corner' style='font-size:" + Math.round(p2s*0.7) + "pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
+      // 代收貨款標示
+      + "<div style='background:#ffebee;border:2px solid #c00;color:#c00;padding:4px 10px;font-weight:700;text-align:center;margin-bottom:3mm;font-size:" + Math.round(p2s*1.1) + "pt;letter-spacing:2px;'>代 收 貨 款 · 掛 號 運 送 單</div>"
+      // 寄件人區
+      + "<div>"
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
+      + "<table class='zip-table' style='margin-left:3mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>姓名：<span class='post-line' style='min-width:40mm;'>雋永紙藝</span>"
+      + "<span style='margin-left:5mm;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
+      // 寄件人存簿儲金帳戶
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:2mm;background:#fff9c4;padding:2mm 3mm;border-radius:2mm;'>"
+      + "<span>寄件人存簿儲金局號：<b>003159-1</b></span>"
+      + "<span style='margin-left:6mm;'>帳號：<b>059723-2</b></span>"
+      + "</div>"
+      // 代收金額
+      + "<div class='post-row' style='font-size:" + p2s + "pt;margin-top:2mm;color:#c00;font-weight:700;border:1.5px solid #c00;padding:2mm 3mm;border-radius:2mm;background:#ffebee;'>"
+      + "<span>代收金額：新台幣</span>"
+      + "<span style='flex:1;padding:0 3mm;font-size:" + Math.round(p2s*1.3) + "pt;letter-spacing:1px;border-bottom:1px solid #c00;margin:0 3mm;'>" + esc(codAmountChinese) + "</span>"
+      + "<span style='margin-left:4mm;font-size:" + Math.round(p2s*0.9) + "pt;'>(" + esc(codAmountArabic) + ")</span>"
+      + "</div>"
+      + "</div>"
+      + "<div class='post-divider'></div>"
+      // 收件人區
+      + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"
+      + "<div class='post-row'><table class='zip-table' style='transform:scale(" + (p2s/10).toFixed(1) + ");transform-origin:left center;margin:2mm 0 " + Math.round(p2s*0.5) + "mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
+      + "<div class='post-row' style='margin-top:2mm;align-items:flex-start;'>"
+      + "<span class='recv-label' style='font-size:" + Math.round(p2s*1.6) + "pt;margin-right:4mm;'>收件人</span>"
+      + "<div style='flex:1;'>"
+      + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:" + Math.round(p2s*0.3) + "mm;'>地址：<span class='post-line' style='flex:1;'>" + esc(recvAddrClean2) + "</span></div>"
+      + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:" + Math.round(p2s*0.3) + "mm;'>姓名：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.4) + "pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
+      + "<div class='post-row' style='font-size:" + p2s + "pt;'>電話：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.2) + "pt;'>" + esc(recvPhone2) + "</span></div>"
+      + "</div></div>"
+      + "</div>"
+      + "<div class='post-divider'></div>"
+      // 投遞時段、無法投遞處理、內容物
+      + "<div style='font-size:" + Math.round(p2s*0.8) + "pt;color:#333;line-height:2;'>"
+      + "<div>快捷希望送達時段：<b>☑ 白天(0900-1800)</b>　☐ 晚上(1800-2100)</div>"
+      + "<div>無法投遞處理方式：<b>☑ 退回原局轉退寄件人</b></div>"
+      + "<div>內裝物品：<b>紙藝品</b></div>"
+      + "</div>"
+      + "</div></div>";
+  } else {
+    // ============ 普通掛號運送單 ============
+    page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
+      + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;font-size:" + p2s + "pt;'>"
+      + "<div class='post-corner' style='font-size:" + Math.round(p2s*0.7) + "pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
+      + "<div>"
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
+      + "<table class='zip-table' style='margin-left:3mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>姓名：<span class='post-line' style='min-width:40mm;'>雋永紙藝</span>"
+      + "<span style='margin-left:5mm;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
+      + "</div>"
+      + "<div class='post-divider'></div>"
+      + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"
+      + "<div class='post-row'><table class='zip-table' style='transform:scale(" + (p2s/10).toFixed(1) + ");transform-origin:left center;margin:2mm 0 " + Math.round(p2s*0.5) + "mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
+      + "<div class='post-row' style='margin-top:2mm;align-items:flex-start;'>"
+      + "<span class='recv-label' style='font-size:" + Math.round(p2s*1.6) + "pt;margin-right:4mm;'>收件人</span>"
+      + "<div style='flex:1;'>"
+      + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:" + Math.round(p2s*0.3) + "mm;'>地址：<span class='post-line' style='flex:1;'>" + esc(recvAddrClean2) + "</span></div>"
+      + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:" + Math.round(p2s*0.3) + "mm;'>姓名：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.4) + "pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
+      + "<div class='post-row' style='font-size:" + p2s + "pt;'>電話：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.2) + "pt;'>" + esc(recvPhone2) + "</span></div>"
+      + "</div></div>"
+      + "</div>"
+      + "<div class='post-divider'></div>"
+      + "<div style='font-size:" + Math.round(p2s*0.75) + "pt;color:#555;line-height:1.8;'>"
+      + "<div>內容物：紙藝品　　無法投遞處理方式：退回寄件人</div>"
+      + "</div>"
+      + "</div></div>";
+  }
 
   var printBody = page1HTML + page2HTML;
   var win = window.open("", "_blank", "width=800,height=700");

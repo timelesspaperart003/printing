@@ -163,11 +163,7 @@
       <div id="search-status" class="status">輸入關鍵字後按搜尋</div>
     </div>
     <div class="card" style="margin-top:0.75rem;">
-      <button class="primary" onclick="loadTodayShipping()" style="background:#2e7d32;border-color:#2e7d32;">📦 今日出貨單</button>
-      <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">完成期限為今天 · 標題含「出貨」</div>
-    </div>
-    <div class="card" style="margin-top:0.75rem;">
-      <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--text);">📅 查詢其他日期</div>
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--text);">📅 查詢出貨單</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <input type="date" id="custom-date" style="flex:1;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:inherit;" />
         <button onclick="loadShippingByDate()" style="white-space:nowrap;">查詢</button>
@@ -421,45 +417,7 @@ function renderShippingList() {
     ? state.tasks.filter(function(t) { return !isClosedStatus(t.status); })
     : state.tasks;
 
-  // ===== 頂部控制列：篩選 toggle + 全選 =====
-  var controlsHTML = '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">';
-  // 第 1 行：篩選 toggle
-  controlsHTML += '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none;margin-bottom:8px;">'
-    + '<input type="checkbox" id="toggle-hide-closed" ' + (state.hideClosed ? 'checked' : '') + ' style="width:17px;height:17px;cursor:pointer;">'
-    + '<span>只顯示非結案任務</span>'
-    + '<span style="color:var(--text-muted);font-size:11px;margin-left:auto;">(' + displayedTasks.length + ' / ' + state.tasks.length + ')</span>'
-    + '</label>';
-  // 第 2 行：全選 + 勾選彙整按鈕
   var selCount = countSelected();
-  controlsHTML += '<div style="display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid var(--border);">'
-    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none;">'
-    +   '<input type="checkbox" id="toggle-select-all" style="width:17px;height:17px;cursor:pointer;">'
-    +   '<span>全選</span>'
-    + '</label>'
-    + '<span style="color:var(--text-muted);font-size:11px;margin-left:auto;">已勾選 ' + selCount + ' 筆</span>'
-    + '</div>';
-  controlsHTML += '</div>';
-  var controls = document.createElement('div');
-  controls.innerHTML = controlsHTML;
-  listEl.appendChild(controls);
-
-  // 繫結 toggle
-  document.getElementById('toggle-hide-closed').addEventListener('change', function(e) {
-    state.hideClosed = e.target.checked;
-    renderShippingList();
-  });
-  document.getElementById('toggle-select-all').addEventListener('change', function(e) {
-    // 根據目前顯示的 tasks 作用
-    if (e.target.checked) {
-      displayedTasks.forEach(function(t) { state.selected[t.id] = true; });
-    } else {
-      displayedTasks.forEach(function(t) { delete state.selected[t.id]; });
-    }
-    renderShippingList();
-  });
-  // 同步「全選」勾選狀態：目前顯示的全都勾 → checked
-  var allSelected = displayedTasks.length > 0 && displayedTasks.every(function(t) { return !!state.selected[t.id]; });
-  document.getElementById('toggle-select-all').checked = allSelected;
 
   // ===== 總清單按鈕（全部 / 勾選） =====
   var btnRow = document.createElement('div');

@@ -237,7 +237,11 @@ async function loadTodayShipping() {
     results.forEach(function(task) {
       var div = document.createElement("div");
       div.className = "task-item";
+      var contactLine = task.contactNotionName
+        ? '<div class="task-item-date" style="color:#1976d2;font-weight:500;">👤 ' + esc(task.contactNotionName) + '</div>'
+        : '';
       div.innerHTML = '<div class="task-item-title">' + esc(task.title) + '</div>'
+        + contactLine
         + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
       div.onclick = function() { loadDetail(task.id); };
       listEl.appendChild(div);
@@ -279,8 +283,10 @@ async function loadTodaySummary() {
     var orderBreakdown = [];// 訂單明細
 
     detailResults.forEach(function(r) {
+      // 優先用 detail API 回的 contactNotionName，退回用 task 帶過來的
+      var contact = (r.detail && r.detail.contactNotionName) || r.task.contactNotionName || '';
       if (!r.detail || r.detail.error) {
-        orderBreakdown.push({ title: r.task.title, items: [], gifts: [], error: true });
+        orderBreakdown.push({ title: r.task.title, contact: contact, items: [], gifts: [], error: true });
         return;
       }
       var parsed = parseItemText(cleanItemText(r.detail.itemText || ""));
@@ -296,7 +302,7 @@ async function loadTodaySummary() {
         giftAgg[g.name] = (giftAgg[g.name] || 0) + q;
         obGifts.push({ name: g.name, qty: q });
       });
-      orderBreakdown.push({ title: r.task.title, items: obItems, gifts: obGifts, error: false });
+      orderBreakdown.push({ title: r.task.title, contact: contact, items: obItems, gifts: obGifts, error: false });
     });
 
     // 抓商品資料（SKU、位置、圖片）
@@ -398,7 +404,9 @@ function renderSummary(agg, giftAgg, orderBreakdown, productInfo) {
     var itemCount = ob.items.reduce(function(s,i){return s+i.qty;},0);
     var giftCount = ob.gifts.reduce(function(s,i){return s+i.qty;},0);
     html += '<details style="margin-bottom:6px;border:1px solid var(--border);border-radius:6px;padding:8px;">';
-    html += '<summary style="cursor:pointer;font-weight:500;font-size:13px;">' + esc(ob.title);
+    html += '<summary style="cursor:pointer;font-weight:500;font-size:13px;">';
+    if (ob.contact) html += '<span style="color:#1976d2;font-weight:600;">👤 ' + esc(ob.contact) + '</span>　';
+    html += esc(ob.title);
     if (ob.error) html += ' <span style="color:#c00;">（讀取失敗）</span>';
     else html += ' <span style="color:var(--text-muted);font-size:12px;">　商品 ' + itemCount + ' 件' + (giftCount > 0 ? '、贈品 ' + giftCount + ' 件' : '') + '</span>';
     html += '</summary>';
@@ -478,7 +486,9 @@ function printSummary() {
     var itemCount = ob.items.reduce(function(s,i){return s+i.qty;},0);
     var giftCount = ob.gifts.reduce(function(s,i){return s+i.qty;},0);
     body += '<div class="order-block">';
-    body += '<div class="order-title">' + esc(ob.title);
+    body += '<div class="order-title">';
+    if (ob.contact) body += '<span style="color:#1976d2;">👤 ' + esc(ob.contact) + '</span>　';
+    body += esc(ob.title);
     if (!ob.error) body += '　<span style="font-weight:normal;color:#666;font-size:9pt;">商品 ' + itemCount + (giftCount > 0 ? ' / 贈品 ' + giftCount : '') + '</span>';
     body += '</div>';
     if (!ob.error) {

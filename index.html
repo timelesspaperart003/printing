@@ -256,12 +256,15 @@ function cleanItemText(text) {
   return result.join("\n").trim();
 }
 
-// [v3.1] 新邏輯：同上，切點從 V/v/已備好 改成 *數字 後面
-// 沒有 *數字 的行仍可辨識為 payment / 備註
+// [v3.2] 新邏輯：
+//   - 切點從 V/v/已備好 改成 *數字 後面
+//   - 加「贈品模式」：遇到 `贈` 開頭的行就進入贈品模式，後續 *N 行都算贈品
+//   - 修掉 `贈：` 獨佔一行會 push 空贈品的 bug
 function parseItemText(text) {
   if (!text) return { items: [], gifts: [], notes: [], payment: "" };
   var lines = text.split("\n");
   var items = [], gifts = [], notes = [], payment = "";
+  var inGiftMode = false;
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     if (!line) continue;
@@ -271,14 +274,37 @@ function parseItemText(text) {
       line = line.substring(0, qtyMatch.index + qtyMatch[0].length).trim();
     }
     if (!line) continue;
-    if (/需收款|免收款/.test(line)) { payment = line; continue; }
-    if (/^贈/.test(line)) {
-      var giftName = line.replace(/^贈[：:：]?\s*/, "").trim();
-      var giftQtyMatch = giftName.match(/^(.+?)\s*\*(\d+)\s*$/);
-      if (giftQtyMatch) gifts.push({ name: giftQtyMatch[1].trim(), qty: giftQtyMatch[2] });
-      else gifts.push({ name: giftName, qty: "1" });
+    // 需收款/免收款 → payment，離開贈品模式
+    if (/需收款|免收款/.test(line)) {
+      payment = line;
+      inGiftMode = false;
       continue;
     }
+    // 遇到「贈」開頭 → 進入贈品模式
+    if (/^贈/.test(line)) {
+      inGiftMode = true;
+      var giftName = line.replace(/^贈[：:：]?\s*/, "").trim();
+      if (giftName) {
+        // 同一行已有贈品商品
+        var giftQtyMatch = giftName.match(/^(.+?)\s*\*(\d+)\s*$/);
+        if (giftQtyMatch) gifts.push({ name: giftQtyMatch[1].trim(), qty: giftQtyMatch[2] });
+        else gifts.push({ name: giftName, qty: "1" });
+      }
+      // 若只是「贈：」獨佔一行 → 只進入模式、不 push
+      continue;
+    }
+    // 贈品模式中：*N 行算贈品、其他行當備註
+    if (inGiftMode) {
+      if (/\*\d+/.test(line)) {
+        var gm = line.match(/^(.+?)\s*\*(\d+)\s*$/);
+        if (gm) gifts.push({ name: gm[1].trim(), qty: gm[2] });
+        else gifts.push({ name: line, qty: "1" });
+      } else {
+        notes.push(line);
+      }
+      continue;
+    }
+    // 一般商品
     if (/\*\d+/.test(line)) {
       var m = line.match(/^(.+?)\s*\*(\d+)\s*$/);
       if (m) items.push({ name: m[1].trim(), qty: m[2] });

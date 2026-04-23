@@ -1401,7 +1401,7 @@ function doPrint() {
     var codAmountArabic = pinfo.amount ? ('$' + pinfo.amount) : '$________';
     page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
       + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;font-size:" + p2s + "pt;'>"
-      + "<div class='post-corner' style='font-size:" + Math.round(p2s*0.7) + "pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
+      + "<div class='post-corner' style='font-size:" + Math.round(p2s*0.7) + "pt;line-height:1.5;'>特約戶編號：704009001383</div>"
       // 代收貨款標示
       + "<div style='background:#ffebee;border:2px solid #c00;color:#c00;padding:4px 10px;font-weight:700;text-align:center;margin-bottom:3mm;font-size:" + Math.round(p2s*1.1) + "pt;letter-spacing:2px;'>代 收 貨 款 · 掛 號 運 送 單</div>"
       // 寄件人區
@@ -1437,7 +1437,7 @@ function doPrint() {
       + "</div>"
       + "<div class='post-divider'></div>"
       // 投遞時段、無法投遞處理、內容物（橫向一行，省空間）
-      + "<div style='font-size:" + Math.round(p2s*0.75) + "pt;color:#333;display:flex;gap:8mm;flex-wrap:wrap;align-items:center;'>"
+      + "<div style='font-size:" + p2s + "pt;color:#333;display:flex;gap:6mm;flex-wrap:wrap;align-items:center;'>"
       + "<span>時段：<b>☑ 白天(0900-1800)</b>　☐ 晚上(1800-2100)</span>"
       + "<span>無法投遞：<b>☑ 退回原局轉退寄件人</b></span>"
       + "<span>內裝物品：<b>紙藝品</b></span>"
@@ -1447,7 +1447,7 @@ function doPrint() {
     // ============ 普通掛號運送單 ============
     page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
       + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;justify-content:space-between;font-size:" + p2s + "pt;'>"
-      + "<div class='post-corner' style='font-size:" + Math.round(p2s*0.7) + "pt;line-height:1.5;'>特約戶編號：<br>704009001383</div>"
+      + "<div class='post-corner' style='font-size:" + Math.round(p2s*0.7) + "pt;line-height:1.5;'>特約戶編號：704009001383</div>"
       + "<div>"
       + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
       + "<table class='zip-table' style='margin-left:3mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"

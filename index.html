@@ -236,19 +236,18 @@ async function loadDetail(pageId) {
   }
 }
 
+// [v3.1] 新邏輯：切點從 V/v/已備好 改成 *數字 後面
+// 範例：「紙紮貓屋 *3 已備好 V3」 → 「紙紮貓屋 *3」
+// 沒有 *數字 的行（備註、需收款…）原樣保留
 function cleanItemText(text) {
   if (!text) return "";
   var lines = text.split("\n");
   var result = [];
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
-    var cutIdx = -1;
-    var vMatch = line.match(/ [Vv] /);
-    if (vMatch) cutIdx = vMatch.index;
-    var prepIdx = line.indexOf("已備好");
-    if (prepIdx >= 0 && (cutIdx < 0 || prepIdx < cutIdx)) cutIdx = prepIdx;
-    if (cutIdx >= 0) {
-      var trimmed = line.substring(0, cutIdx).trim();
+    var m = line.match(/\*\d+/);
+    if (m) {
+      var trimmed = line.substring(0, m.index + m[0].length).trim();
       if (trimmed) result.push(trimmed);
     } else {
       result.push(line);
@@ -257,6 +256,8 @@ function cleanItemText(text) {
   return result.join("\n").trim();
 }
 
+// [v3.1] 新邏輯：同上，切點從 V/v/已備好 改成 *數字 後面
+// 沒有 *數字 的行仍可辨識為 payment / 備註
 function parseItemText(text) {
   if (!text) return { items: [], gifts: [], notes: [], payment: "" };
   var lines = text.split("\n");
@@ -264,12 +265,11 @@ function parseItemText(text) {
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     if (!line) continue;
-    var cutIdx = -1;
-    var vMatch = line.match(/ [Vv] /);
-    if (vMatch) cutIdx = vMatch.index;
-    var prepIdx = line.indexOf("已備好");
-    if (prepIdx >= 0 && (cutIdx < 0 || prepIdx < cutIdx)) cutIdx = prepIdx;
-    if (cutIdx >= 0) line = line.substring(0, cutIdx).trim();
+    // 有 *數字 → 切到 *數字結尾
+    var qtyMatch = line.match(/\*\d+/);
+    if (qtyMatch) {
+      line = line.substring(0, qtyMatch.index + qtyMatch[0].length).trim();
+    }
     if (!line) continue;
     if (/需收款|免收款/.test(line)) { payment = line; continue; }
     if (/^贈/.test(line)) {

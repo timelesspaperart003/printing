@@ -1276,8 +1276,53 @@ function doPrint() {
     "body { font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #111; background: white; }",
     "@page p1 { size: A4 portrait; margin: 10mm; }",
     "@page p2 { size: A4 landscape; margin: 10mm; }",
+    "@page p2cod { size: A4 portrait; margin: 8mm; }",
     ".page1 { page: p1; width: 190mm; min-height: 267mm; }",
     ".page2 { page: p2; page-break-before: always; width: 277mm; min-height: 190mm; }",
+    ".page2-cod { page: p2cod; page-break-before: always; width: 194mm; box-sizing: border-box; font-size: 9pt; color: #111; line-height: 1.35; }",
+    /* 三聯單：每聯 */
+    ".cod-copy { border: 1px solid #000; display: flex; }",
+    ".cod-copy + .cod-copy { border-top: none; }",
+    ".cod-side { width: 13mm; border-right: 1px solid #000; color: #c00; font-weight: 700; padding: 2mm 1mm; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2mm; }",
+    ".cod-title-v { writing-mode: vertical-rl; font-size: 11pt; letter-spacing: 3px; line-height: 1.4; }",
+    ".cod-sub-v { font-size: 7pt; line-height: 1.4; font-weight: 500; writing-mode: vertical-rl; letter-spacing: 1px; }",
+    ".cod-circle { width: 10mm; height: 10mm; border: 1.5px solid #c00; border-radius: 50%; margin: 1mm auto; }",
+    ".cod-main { flex: 1; padding: 1.5mm 2mm; display: flex; flex-direction: column; }",
+    ".cod-sec { padding: 0.8mm 0; border-bottom: 0.5px dashed #aaa; }",
+    ".cod-sec:last-child { border-bottom: none; }",
+    ".cod-row { padding: 0.4mm 0; }",
+    ".cod-row-2 { display: flex; gap: 4mm; padding: 0.4mm 0; }",
+    ".cod-row-2 > span { flex: 1; }",
+    ".cod-sec-recv { display: flex; gap: 2mm; align-items: stretch; }",
+    ".cod-recv-left { flex: 1; }",
+    ".cod-postage-paid { width: 20mm; border: 1.2px solid #000; text-align: center; padding: 2mm 1mm; font-weight: 600; font-size: 8pt; display: flex; align-items: center; justify-content: center; line-height: 1.3; }",
+    ".cod-zip { display: inline-table; border-collapse: collapse; vertical-align: middle; }",
+    ".cod-zip td { border: 1px solid #333; width: 5mm; height: 5mm; text-align: center; font-size: 9pt; }",
+    ".cod-items-table { width: 100%; border-collapse: collapse; margin-top: 0.8mm; }",
+    ".cod-items-table th, .cod-items-table td { border: 1px solid #000; padding: 1mm 1.5mm; text-align: center; font-size: 8pt; }",
+    ".cod-items-table th { background: #f5f5f5; font-weight: 600; }",
+    ".cod-items-table .cod-amt { color: #c00; font-weight: 700; font-size: 10pt; }",
+    ".cod-fees { display: flex; gap: 5mm; padding: 0.8mm 1mm; font-size: 8pt; }",
+    ".cod-fees > span { flex: 1; }",
+    ".cod-fill { display: inline-block; min-width: 18mm; border-bottom: 1px solid #333; padding: 0 3mm; }",
+    ".cod-bottom { display: flex; gap: 2mm; padding: 0.5mm 0; font-size: 6.5pt; }",
+    ".cod-agreement { flex: 1.2; line-height: 1.4; }",
+    ".cod-agreement-title { font-weight: 600; margin-bottom: 0.5mm; color: #c00; }",
+    ".cod-agreement ol { margin: 0; padding-left: 4mm; }",
+    ".cod-agreement li { margin-bottom: 0.3mm; }",
+    ".cod-undeliv { flex: 1; font-size: 8pt; line-height: 1.8; border-left: 0.5px dashed #aaa; padding-left: 2mm; }",
+    ".cod-perf { border-top: 1.5px dashed #888; margin: 1.5mm 0; height: 0; }",
+    /* 底部劃撥存款單 */
+    ".cod-deposit { border: 1px solid #000; margin-top: 1mm; }",
+    ".cod-tx-code { padding: 1mm 3mm; border-bottom: 1px dashed #666; font-size: 8pt; font-weight: 600; }",
+    ".cod-deposit-split { display: flex; }",
+    ".cod-deposit-form, .cod-receipt { flex: 1; padding: 2mm 3mm; }",
+    ".cod-deposit-form { border-right: 1.5px dashed #000; }",
+    ".cod-deposit-title { font-weight: 700; text-align: center; margin-bottom: 2mm; font-size: 10pt; }",
+    ".cod-deposit-row { padding: 1mm 0; font-size: 8pt; }",
+    ".cod-deposit-label-v { writing-mode: vertical-rl; letter-spacing: 2px; font-size: 8pt; display: inline-block; vertical-align: top; padding: 2mm 0; margin-right: 2mm; border: 1px solid #999; padding: 2mm 1mm; }",
+    ".cod-deposit-box { border: 1px solid #999; padding: 3mm; min-height: 12mm; font-size: 8pt; color: #999; }",
+    ".cod-deposit-box-tall { min-height: 18mm; }",
     "html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }",
     ".doc-title { font-size: " + Math.round(p1FontSize * 1.2) + "pt; font-weight: 700; letter-spacing: 4px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }",
     ".info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: " + Math.round(p1FontSize * 0.7) + "pt; }",
@@ -1396,57 +1441,150 @@ function doPrint() {
 
   var page2HTML;
   if (useCod) {
-    // ============ 代收貨款運送單 ============
-    var codAmountChinese = pinfo.amount ? numToChineseUppercase(pinfo.amount) : '_________________元整';
-    var codAmountArabic = pinfo.amount ? ('$' + pinfo.amount) : '$________';
-    page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"
-      + "<div class='post-wrap' style='height:100%;display:flex;flex-direction:column;font-size:" + p2s + "pt;'>"
-      // 代收貨款標示（特約戶編號嵌在右上角內）
-      + "<div style='background:#ffebee;border:2px solid #c00;color:#c00;padding:3px 10px;font-weight:700;margin-bottom:2mm;font-size:" + Math.round(p2s*1.1) + "pt;letter-spacing:2px;position:relative;text-align:center;'>"
-      + "代 收 貨 款 · 掛 號 運 送 單"
-      + "<span style='position:absolute;top:50%;right:8px;transform:translateY(-50%);font-size:" + Math.round(p2s*0.7) + "pt;font-weight:500;letter-spacing:0;white-space:nowrap;'>特約戶編號：704009001383</span>"
+    // ============ 代收貨款三聯單 (A4 直式) ============
+    var codAmountChinese = pinfo.amount ? numToChineseUppercase(pinfo.amount) : '';
+    var codAmountArabic = pinfo.amount ? String(pinfo.amount) : '';
+
+    // 三聯單用的 zip cells
+    function codZipCells(zip, count) {
+      var h = '';
+      for (var i = 0; i < count; i++) h += '<td>' + (zip[i]||'') + '</td>';
+      return h;
+    }
+
+    // 建構一聯（第一聯 / 第二聯）的共用內容
+    function buildCodCopy(copyNum) {
+      var copyLabel = copyNum === 1 ? '（第一聯　收件人收存聯）' : '（第二聯　投遞局聯）';
+      // 第二聯才有劃撥 / 存簿儲金帳號
+      var depositFields = copyNum === 2 ? (
+          "<div class='cod-row'>寄件人郵政劃撥帳號：<span class='cod-fill' style='min-width:30mm;'></span></div>"
+        + "<div class='cod-row-2'>"
+        +   "<span>入戶匯款局號：<b>003159-1</b></span>"
+        +   "<span>存簿儲金帳號：<b>059723-2</b></span>"
+        + "</div>"
+      ) : '';
+
+      return ""
+        + "<div class='cod-copy'>"
+        // 左側紅字直排
+        + "  <div class='cod-side'>"
+        + "    <div class='cod-circle'></div>"
+        + "    <div style='display:flex;gap:1mm;'>"
+        + "      <span class='cod-title-v'>代收貨款郵件詳情單</span>"
+        + "      <span class='cod-sub-v'>" + copyLabel + "</span>"
+        + "    </div>"
+        + "  </div>"
+        // 右側主內容
+        + "  <div class='cod-main'>"
+        // 寄件人區
+        + "    <div class='cod-sec'>"
+        + "      <div class='cod-row-2'>"
+        + "        <span>寄件人姓名：<b>雋永紙藝</b></span>"
+        + "        <span>電話：<b>0961-561-234 / 062-052-140</b></span>"
+        + "      </div>"
+        + "      <div class='cod-row'>詳細地址：<b>台南市仁德區太子五街22巷1號</b></div>"
+        +        depositFields
+        + "    </div>"
+        // 收件人區 + 國內郵資已付
+        + "    <div class='cod-sec cod-sec-recv'>"
+        + "      <div class='cod-recv-left'>"
+        + "        <div class='cod-row'>收件人　郵遞區號：<table class='cod-zip'><tr>" + codZipCells(recvZip2, 3) + "</tr></table></div>"
+        + "        <div class='cod-row'>　　　　地址：<b>" + esc(recvAddrClean2) + "</b></div>"
+        + "        <div class='cod-row-2'>"
+        + "          <span>姓名：<b>" + esc(recvName2) + "</b></span>"
+        + "          <span>電話：<b>" + esc(recvPhone2) + "</b></span>"
+        + "        </div>"
+        + "        <div class='cod-row'>快捷希望送達時段：<b>☑ 白天(0900-1800)　☐ 晚上(1800-2100)</b></div>"
+        + "      </div>"
+        + "      <div class='cod-postage-paid'>國內<br>郵資已付</div>"
+        + "    </div>"
+        // 商品表
+        + "    <table class='cod-items-table'>"
+        + "      <tr>"
+        + "        <th style='width:30%;'>內裝物品名稱</th>"
+        + "        <th style='width:13%;'>價值(元)</th>"
+        + "        <th style='width:17%;'>代收金額(元)</th>"
+        + "        <th style='width:25%;'>速皮重量／尺寸</th>"
+        + "        <th style='width:15%;'>公斤／公分</th>"
+        + "      </tr>"
+        + "      <tr>"
+        + "        <td><b>紙藝品</b></td>"
+        + "        <td></td>"
+        + "        <td class='cod-amt'>" + (codAmountArabic ? "<b>" + esc(codAmountArabic) + "</b>" : "") + "</td>"
+        + "        <td></td>"
+        + "        <td></td>"
+        + "      </tr>"
+        + "    </table>"
+        // 郵資 / 代收貨款費 / 共計
+        + "    <div class='cod-fees'>"
+        + "      <span>郵資：<span class='cod-fill'></span></span>"
+        + "      <span>代收貨款費：<span class='cod-fill'></span></span>"
+        + "      <span>共計：<span class='cod-fill'></span>元</span>"
+        + "    </div>"
+        // 約定事項 + 無法投遞處理方式
+        + "    <div class='cod-bottom'>"
+        + "      <div class='cod-agreement'>"
+        + "        <div class='cod-agreement-title'>約定事項</div>"
+        + "        <ol>"
+        + "          <li>寄件人交寄本郵件，即視為同意下列條款：</li>"
+        + "          <li>寄件人證明本人所填資料真實，並願寄交所載之物品，如有不實，願付全部責任。</li>"
+        + "          <li>代收貨款郵件應迅速送達，若因寄存於郵件之時日延誤，補償金額依郵件相關規定辦理。</li>"
+        + "          <li>本詳情單郵局於投遞後，如收件人認為未訂購或內容不符，由寄款人負擔，郵局將其寄退送貨款，郵件改由收件人負責退款寄回。</li>"
+        + "          <li>代收貨款內含物價值者，未能送達退回時，僅退還代收貨款。</li>"
+        + "        </ol>"
+        + "      </div>"
+        + "      <div class='cod-undeliv'>"
+        + "        <div style='font-weight:600;margin-bottom:0.5mm;'>6. 郵件無法投遞處理方式</div>"
+        + "        <div style='font-size:6pt;color:#666;'>(並依有關郵件規定加付改寄或退回資費)</div>"
+        + "        <div>☐ 改投或改寄：</div>"
+        + "        <div style='padding-left:3mm;font-size:7pt;'>姓名 ________　地址 ________</div>"
+        + "        <div><b>☑ 退回原寄局轉退寄件人</b></div>"
+        + "        <div style='margin-top:1mm;'>寄件人簽名：________________</div>"
+        + "      </div>"
+        + "    </div>"
+        + "  </div>"
+        + "</div>";
+    }
+
+    page2HTML = ""
+      + "<div class='page2-cod'>"
+      // 頂部特約戶編號小字
+      + "<div style='text-align:right;font-size:8pt;color:#c00;margin-bottom:1mm;'>特約戶編號：704009001383</div>"
+      // 第一聯
+      + buildCodCopy(1)
+      // 騎縫虛線
+      + "<div class='cod-perf'></div>"
+      // 第二聯
+      + buildCodCopy(2)
+      // 騎縫虛線
+      + "<div class='cod-perf'></div>"
+      // 第三聯：底部劃撥存款單 + 收據
+      + "<div class='cod-deposit'>"
+      +   "<div class='cod-tx-code'>交易代號：劃撥存款 <b>0556</b>　　　入戶匯款 <b>5502</b></div>"
+      +   "<div class='cod-deposit-split'>"
+      //   左半：劃撥存款單
+      +     "<div class='cod-deposit-form'>"
+      +       "<div class='cod-deposit-title'>代收貨款郵件　劃撥存款單／存簿匯款</div>"
+      +       "<div class='cod-deposit-row'>收款帳戶　　局號：________________</div>"
+      +       "<div class='cod-deposit-row'>　　　　　　戶名：________________</div>"
+      +       "<div class='cod-deposit-row'>代收金額：新台幣 ________________</div>"
+      +       "<div class='cod-deposit-row cod-deposit-box'>寄款人資料</div>"
+      +       "<div class='cod-deposit-row cod-deposit-box cod-deposit-box-tall'>機器印證欄</div>"
+      +       "<div class='cod-deposit-row'>金額：________________</div>"
+      +     "</div>"
+      //   右半：收據
+      +     "<div class='cod-receipt'>"
+      +       "<div class='cod-deposit-title'>代收貨款郵件　劃撥存款／存簿匯款 收據</div>"
+      +       "<div class='cod-deposit-row'>帳號及戶名：________________</div>"
+      +       "<div class='cod-deposit-row'>金額：________________</div>"
+      +       "<div class='cod-deposit-row cod-deposit-box'>機器印證欄</div>"
+      +       "<div class='cod-deposit-row cod-deposit-box cod-deposit-box-tall' style='text-align:center;'>經辦局章戳</div>"
+      +     "</div>"
+      +   "</div>"
       + "</div>"
-      // 寄件人區
-      + "<div>"
-      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-bottom:2mm;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
-      + "<table class='zip-table' style='margin-left:3mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
-      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-bottom:1.5mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
-      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-bottom:1.5mm;'>姓名：<span class='post-line' style='min-width:40mm;'>雋永紙藝</span>"
-      + "<span style='margin-left:5mm;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
-      // 寄件人存簿儲金帳戶
-      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1.5mm;background:#fff9c4;padding:1.5mm 3mm;border-radius:2mm;'>"
-      + "<span>寄件人存簿儲金局號：<b>003159-1</b></span>"
-      + "<span style='margin-left:6mm;'>帳號：<b>059723-2</b></span>"
-      + "</div>"
-      // 代收金額
-      + "<div class='post-row' style='font-size:" + p2s + "pt;margin-top:1.5mm;color:#c00;font-weight:700;border:1.5px solid #c00;padding:1.5mm 3mm;border-radius:2mm;background:#ffebee;'>"
-      + "<span>代收金額：新台幣</span>"
-      + "<span style='flex:1;padding:0 3mm;font-size:" + Math.round(p2s*1.3) + "pt;letter-spacing:1px;border-bottom:1px solid #c00;margin:0 3mm;'>" + esc(codAmountChinese) + "</span>"
-      + "<span style='margin-left:4mm;font-size:" + Math.round(p2s*0.9) + "pt;'>(" + esc(codAmountArabic) + ")</span>"
-      + "</div>"
-      + "</div>"
-      + "<div class='post-divider'></div>"
-      // 收件人區
-      + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"
-      + "<div class='post-row'><table class='zip-table' style='transform:scale(" + (p2s/10).toFixed(1) + ");transform-origin:left center;margin:1mm 0 3mm 0;'><tr>" + zipBoxes2(recvZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2(recvZip2.length>3?recvZip2.slice(3):"",2) + "</tr></table></div>"
-      + "<div class='post-row' style='margin-top:1mm;align-items:flex-start;'>"
-      + "<span class='recv-label' style='font-size:" + Math.round(p2s*1.6) + "pt;margin-right:4mm;'>收件人</span>"
-      + "<div style='flex:1;'>"
-      + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:2mm;'>地址：<span class='post-line' style='flex:1;'>" + esc(recvAddrClean2) + "</span></div>"
-      + "<div class='post-row' style='font-size:" + p2s + "pt;margin-bottom:2mm;'>姓名：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.4) + "pt;font-weight:700;'>" + esc(recvName2) + "</span></div>"
-      + "<div class='post-row' style='font-size:" + p2s + "pt;'>電話：<span class='post-line' style='flex:1;font-size:" + Math.round(p2s*1.2) + "pt;'>" + esc(recvPhone2) + "</span></div>"
-      + "</div></div>"
-      + "</div>"
-      + "<div class='post-divider'></div>"
-      // 投遞時段 + 無法投遞處理（第一行），內裝物品（第二行）
-      + "<div style='font-size:" + p2s + "pt;color:#333;'>"
-      + "<div style='display:flex;gap:6mm;flex-wrap:wrap;align-items:center;'>"
-      + "<span>時段：<b>☑ 白天(0900-1800)</b>　☐ 晚上(1800-2100)</span>"
-      + "<span>無法投遞：<b>☑ 退回原局轉退寄件人</b></span>"
-      + "</div>"
-      + "<div style='margin-top:1.5mm;'>內裝物品：<b>紙藝品</b></div>"
-      + "</div>"
-      + "</div></div>";
+      // 顯示代收金額國字大寫（給店員參考，若需要可填入上方欄位）
+      + (codAmountChinese ? "<div style='margin-top:2mm;padding:2mm 3mm;background:#fff3e0;border:1px dashed #e65100;color:#c00;font-weight:600;font-size:9pt;'>💡 代收金額國字大寫：<b>" + esc(codAmountChinese) + "</b>　($" + esc(codAmountArabic) + ")</div>" : "")
+      + "</div>";
   } else {
     // ============ 普通掛號運送單 ============
     page2HTML = "<div class='page2' style='width:277mm;height:190mm;'>"

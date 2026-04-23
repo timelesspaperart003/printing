@@ -1436,11 +1436,11 @@ function doPrint() {
       + "</div></div>"
       + "</div>"
       + "<div class='post-divider'></div>"
-      // 投遞時段、無法投遞處理、內容物
-      + "<div style='font-size:" + Math.round(p2s*0.8) + "pt;color:#333;line-height:2;'>"
-      + "<div>快捷希望送達時段：<b>☑ 白天(0900-1800)</b>　☐ 晚上(1800-2100)</div>"
-      + "<div>無法投遞處理方式：<b>☑ 退回原局轉退寄件人</b></div>"
-      + "<div>內裝物品：<b>紙藝品</b></div>"
+      // 投遞時段、無法投遞處理、內容物（橫向一行，省空間）
+      + "<div style='font-size:" + Math.round(p2s*0.75) + "pt;color:#333;display:flex;gap:8mm;flex-wrap:wrap;align-items:center;'>"
+      + "<span>時段：<b>☑ 白天(0900-1800)</b>　☐ 晚上(1800-2100)</span>"
+      + "<span>無法投遞：<b>☑ 退回原局轉退寄件人</b></span>"
+      + "<span>內裝物品：<b>紙藝品</b></span>"
       + "</div>"
       + "</div></div>";
   } else {

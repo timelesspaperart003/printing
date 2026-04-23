@@ -166,6 +166,14 @@
       <button class="primary" onclick="loadTodayShipping()" style="background:#2e7d32;border-color:#2e7d32;">📦 今日出貨單</button>
       <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">完成期限為今天 · 標題含「出貨」</div>
     </div>
+    <div class="card" style="margin-top:0.75rem;">
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--text);">📅 查詢其他日期</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="date" id="custom-date" style="flex:1;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:inherit;" />
+        <button onclick="loadShippingByDate()" style="white-space:nowrap;">查詢</button>
+      </div>
+      <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">完成期限為指定日期 · 標題含「出貨」</div>
+    </div>
     <div id="tasks-list"></div>
   </div>
   <div id="view-detail" style="display:none;">
@@ -326,66 +334,241 @@ async function searchTasks() {
 }
 
 // 今日出貨任務相關狀態
-var todayTasks = [];  // 快取當日任務清單
+var todayTasks = [];       // 快取當日任務清單
+var currentQueryDate = ''; // 目前查詢的日期（'' = 今天）
 
 async function loadTodayShipping() {
+  return loadShippingForDate('', '今日');
+}
+
+async function loadShippingByDate() {
+  var dateInput = document.getElementById('custom-date');
+  if (!dateInput || !dateInput.value) {
+    alert('請先選擇日期');
+    return;
+  }
+  var d = dateInput.value; // yyyy-MM-dd
+  // 中文日期顯示
+  var dateLabel = d.replace(/-/g, '/');
+  return loadShippingForDate(d, dateLabel);
+}
+
+// Notion 狀態顏色對應（背景色 / 文字色）
+var NOTION_STATUS_COLORS = {
+  'default': { bg: '#e0e0e0', fg: '#424242' },
+  'gray':    { bg: '#e0e0e0', fg: '#424242' },
+  'brown':   { bg: '#efe3dc', fg: '#6a4a37' },
+  'orange':  { bg: '#fbe2cd', fg: '#c45c13' },
+  'yellow':  { bg: '#fdecc8', fg: '#a66a00' },
+  'green':   { bg: '#d3e9d7', fg: '#1b6e2a' },
+  'blue':    { bg: '#d3e5ef', fg: '#1c5c85' },
+  'purple':  { bg: '#e8deee', fg: '#6f3a95' },
+  'pink':    { bg: '#f5dfe7', fg: '#b2396f' },
+  'red':     { bg: '#ffe2dd', fg: '#b8342e' }
+};
+
+function renderStatusBadge(status, color) {
+  if (!status) return '';
+  var c = NOTION_STATUS_COLORS[color] || NOTION_STATUS_COLORS['default'];
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:' + c.bg + ';color:' + c.fg + ';margin-right:6px;white-space:nowrap;">' + esc(status) + '</span>';
+}
+
+function isClosedStatus(status) {
+  return status === '結案' || status === '暫結案';
+}
+
+async function loadShippingForDate(dateStr, displayLabel) {
   var statusEl = document.getElementById("search-status");
   var listEl = document.getElementById("tasks-list");
-  statusEl.innerHTML = '<span class="spinner"></span>載入今日出貨任務...';
+  currentQueryDate = dateStr;
+  statusEl.innerHTML = '<span class="spinner"></span>載入' + displayLabel + '出貨任務...';
   statusEl.className = "status";
   listEl.innerHTML = "";
   try {
-    var results = await gasAPI({ action: "todayShipping" });
+    var params = { action: "todayShipping" };
+    if (dateStr) params.date = dateStr;
+    var results = await gasAPI(params);
     if (results.error) throw new Error(results.error);
     todayTasks = results;
     if (!results.length) {
-      statusEl.textContent = "今日沒有出貨任務";
+      statusEl.textContent = displayLabel + "沒有出貨任務";
       return;
     }
-    statusEl.textContent = "今日共 " + results.length + " 筆出貨";
+    statusEl.textContent = displayLabel + "共 " + results.length + " 筆出貨";
 
-    // 加一個「全部商品總清單」按鈕在最上方
-    var summaryBtn = document.createElement("div");
-    summaryBtn.className = "task-item";
-    summaryBtn.style.background = "#fff3e0";
-    summaryBtn.style.borderColor = "#ffb74d";
-    summaryBtn.innerHTML = '<div class="task-item-title" style="color:#e65100;">📋 顯示今日所有商品總清單</div>'
-      + '<div class="task-item-date">合併 ' + results.length + ' 筆訂單（含贈品）</div>';
-    summaryBtn.onclick = function() { loadTodaySummary(); };
-    listEl.appendChild(summaryBtn);
+    // 存成狀態（讓篩選/勾選動作可以在不重打 API 的情況下重繪）
+    window._shippingListState = {
+      tasks: results,
+      displayLabel: displayLabel,
+      hideClosed: false,
+      selected: {} // pageId -> true
+    };
 
-    // 每筆訂單
-    results.forEach(function(task) {
-      var div = document.createElement("div");
-      div.className = "task-item";
-      var contactLine = task.contactNotionName
-        ? '<div class="task-item-date" style="color:#1976d2;font-weight:500;">👤 ' + esc(task.contactNotionName) + '</div>'
-        : '';
-      div.innerHTML = '<div class="task-item-title">' + esc(task.title) + '</div>'
-        + contactLine
-        + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
-      div.onclick = function() { loadDetail(task.id); };
-      listEl.appendChild(div);
-    });
+    renderShippingList();
   } catch(e) {
     statusEl.textContent = "載入失敗：" + e.message;
     statusEl.className = "status error";
   }
 }
 
+function renderShippingList() {
+  var state = window._shippingListState;
+  if (!state) return;
+  var listEl = document.getElementById("tasks-list");
+  listEl.innerHTML = "";
+
+  var displayedTasks = state.hideClosed
+    ? state.tasks.filter(function(t) { return !isClosedStatus(t.status); })
+    : state.tasks;
+
+  // ===== 頂部控制列：篩選 toggle + 全選 =====
+  var controlsHTML = '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">';
+  // 第 1 行：篩選 toggle
+  controlsHTML += '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none;margin-bottom:8px;">'
+    + '<input type="checkbox" id="toggle-hide-closed" ' + (state.hideClosed ? 'checked' : '') + ' style="width:17px;height:17px;cursor:pointer;">'
+    + '<span>只顯示非結案任務</span>'
+    + '<span style="color:var(--text-muted);font-size:11px;margin-left:auto;">(' + displayedTasks.length + ' / ' + state.tasks.length + ')</span>'
+    + '</label>';
+  // 第 2 行：全選 + 勾選彙整按鈕
+  var selCount = countSelected();
+  controlsHTML += '<div style="display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid var(--border);">'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none;">'
+    +   '<input type="checkbox" id="toggle-select-all" style="width:17px;height:17px;cursor:pointer;">'
+    +   '<span>全選</span>'
+    + '</label>'
+    + '<span style="color:var(--text-muted);font-size:11px;margin-left:auto;">已勾選 ' + selCount + ' 筆</span>'
+    + '</div>';
+  controlsHTML += '</div>';
+  var controls = document.createElement('div');
+  controls.innerHTML = controlsHTML;
+  listEl.appendChild(controls);
+
+  // 繫結 toggle
+  document.getElementById('toggle-hide-closed').addEventListener('change', function(e) {
+    state.hideClosed = e.target.checked;
+    renderShippingList();
+  });
+  document.getElementById('toggle-select-all').addEventListener('change', function(e) {
+    // 根據目前顯示的 tasks 作用
+    if (e.target.checked) {
+      displayedTasks.forEach(function(t) { state.selected[t.id] = true; });
+    } else {
+      displayedTasks.forEach(function(t) { delete state.selected[t.id]; });
+    }
+    renderShippingList();
+  });
+  // 同步「全選」勾選狀態：目前顯示的全都勾 → checked
+  var allSelected = displayedTasks.length > 0 && displayedTasks.every(function(t) { return !!state.selected[t.id]; });
+  document.getElementById('toggle-select-all').checked = allSelected;
+
+  // ===== 總清單按鈕（全部 / 勾選） =====
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;';
+
+  var allBtn = document.createElement('div');
+  allBtn.className = 'task-item';
+  allBtn.style.cssText = 'flex:1;background:#fff3e0;border-color:#ffb74d;margin-bottom:0;cursor:pointer;';
+  allBtn.innerHTML = '<div class="task-item-title" style="color:#e65100;font-size:13px;">📋 ' + esc(state.displayLabel) + '全部彙整</div>'
+    + '<div class="task-item-date">全部 ' + displayedTasks.length + ' 筆</div>';
+  allBtn.onclick = function() { loadTodaySummary(state.displayLabel, 'all'); };
+  btnRow.appendChild(allBtn);
+
+  var selBtn = document.createElement('div');
+  selBtn.className = 'task-item';
+  var hasSelection = selCount > 0;
+  selBtn.style.cssText = 'flex:1;background:' + (hasSelection ? '#e8f5e9' : '#f5f5f5') + ';border-color:' + (hasSelection ? '#66bb6a' : '#ccc') + ';margin-bottom:0;cursor:' + (hasSelection ? 'pointer' : 'not-allowed') + ';opacity:' + (hasSelection ? '1' : '0.6') + ';';
+  selBtn.innerHTML = '<div class="task-item-title" style="color:' + (hasSelection ? '#2e7d32' : '#999') + ';font-size:13px;">✅ 僅勾選彙整</div>'
+    + '<div class="task-item-date">勾選的 ' + selCount + ' 筆</div>';
+  if (hasSelection) {
+    selBtn.onclick = function() { loadTodaySummary(state.displayLabel, 'selected'); };
+  }
+  btnRow.appendChild(selBtn);
+
+  listEl.appendChild(btnRow);
+
+  // ===== 訂單清單 =====
+  displayedTasks.forEach(function(task) {
+    var isSelected = !!state.selected[task.id];
+    var wrap = document.createElement('div');
+    wrap.className = 'task-item';
+    wrap.style.cssText = 'display:flex;align-items:stretch;gap:10px;padding:0;overflow:hidden;' + (isSelected ? 'background:#e8f5e9;border-color:#66bb6a;' : '');
+
+    // 左側：核取方塊區
+    var cbArea = document.createElement('div');
+    cbArea.style.cssText = 'display:flex;align-items:center;padding:0 4px 0 12px;background:' + (isSelected ? 'rgba(102,187,106,0.15)' : '#fafafa') + ';';
+    cbArea.innerHTML = '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' style="width:20px;height:20px;cursor:pointer;margin:0;">';
+    cbArea.onclick = function(e) { e.stopPropagation(); };
+    var cb = cbArea.querySelector('input');
+    cb.addEventListener('change', function() {
+      if (cb.checked) state.selected[task.id] = true;
+      else delete state.selected[task.id];
+      renderShippingList();
+    });
+    wrap.appendChild(cbArea);
+
+    // 右側：訂單內容區（點擊進 detail）
+    var content = document.createElement('div');
+    content.style.cssText = 'flex:1;padding:13px 14px;cursor:pointer;min-width:0;';
+    var contactLine = task.contactNotionName
+      ? '<div class="task-item-date" style="color:#1976d2;font-weight:500;">👤 ' + esc(task.contactNotionName) + '</div>'
+      : '';
+    var badge = renderStatusBadge(task.status, task.statusColor);
+    content.innerHTML =
+        '<div class="task-item-title">' + badge + esc(task.title) + '</div>'
+      + contactLine
+      + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
+    content.onclick = function() { loadDetail(task.id); };
+    wrap.appendChild(content);
+
+    listEl.appendChild(wrap);
+  });
+}
+
+function countSelected() {
+  var state = window._shippingListState;
+  if (!state) return 0;
+  return Object.keys(state.selected).length;
+}
+
 /**
- * 載入今日所有訂單 → 解析商品 → 彙整顯示
- * 使用平行 Promise.all 加速
+ * 載入當日所有訂單 → 解析商品 → 彙整顯示
+ * @param {string} displayLabel - 顯示用日期標籤
+ * @param {string} mode - 'all' 全部 / 'selected' 僅勾選的
  */
-async function loadTodaySummary() {
-  if (!todayTasks || todayTasks.length === 0) {
-    alert("請先載入今日出貨任務");
+async function loadTodaySummary(displayLabel, mode) {
+  if (!displayLabel) displayLabel = '今日';
+  if (!mode) mode = 'all';
+  var state = window._shippingListState;
+  if (!state || !state.tasks || state.tasks.length === 0) {
+    alert("請先載入出貨任務");
     return;
   }
+
+  // 決定要彙整哪些
+  var tasksToProcess;
+  if (mode === 'selected') {
+    tasksToProcess = state.tasks.filter(function(t) { return !!state.selected[t.id]; });
+    if (tasksToProcess.length === 0) {
+      alert("尚未勾選任何訂單");
+      return;
+    }
+  } else {
+    // all 模式 → 根據 hideClosed toggle 決定
+    tasksToProcess = state.hideClosed
+      ? state.tasks.filter(function(t) { return !isClosedStatus(t.status); })
+      : state.tasks.slice();
+  }
+
+  // 備份到 todayTasks 為了兼容舊流程（loadTodaySummary 內部用到）
+  todayTasks = tasksToProcess;
+
+  var labelSuffix = mode === 'selected' ? '（勾選）' : '';
+  window._summaryDateLabel = displayLabel + labelSuffix;
+
   document.getElementById("view-search").style.display = "none";
   document.getElementById("view-summary").style.display = "block";
   var summaryEl = document.getElementById("summary-content");
-  summaryEl.innerHTML = '<div class="status"><span class="spinner"></span>讀取 ' + todayTasks.length + ' 筆訂單商品中...</div>';
+  summaryEl.innerHTML = '<div class="status"><span class="spinner"></span>讀取 ' + tasksToProcess.length + ' 筆訂單商品中...</div>';
 
   try {
     // 平行抓取每張訂單的 detail
@@ -470,8 +653,9 @@ function renderSummary(agg, giftAgg, orderBreakdown, productInfo) {
   var totalItemsQty = aggNames.reduce(function(s, n) { return s + agg[n]; }, 0);
   var totalGiftsQty = giftNames.reduce(function(s, n) { return s + giftAgg[n]; }, 0);
 
+  var label = window._summaryDateLabel || '今日';
   var html = '<div style="margin-bottom:12px;">';
-  html += '<h2 style="font-size:16px;margin-bottom:4px;">📋 今日出貨商品總清單</h2>';
+  html += '<h2 style="font-size:16px;margin-bottom:4px;">📋 ' + esc(label) + '出貨商品總清單</h2>';
   html += '<div style="font-size:12px;color:var(--text-muted);">' + esc(today) + '　·　' + orderBreakdown.length + ' 筆訂單　·　商品 ' + totalItemsQty + ' 件　·　贈品 ' + totalGiftsQty + ' 件</div>';
   html += '</div>';
 
@@ -583,7 +767,8 @@ function printSummary() {
     + ".order-items { font-size: 9pt; line-height: 1.6; }"
     + ".order-items .gift { color: #c00; }";
 
-  var body = '<h1>今日出貨商品總清單</h1>'
+  var label = window._summaryDateLabel || '今日';
+  var body = '<h1>' + esc(label) + '出貨商品總清單</h1>'
     + '<div class="sub">' + esc(s.today) + '　·　' + s.orderBreakdown.length + ' 筆訂單　·　商品 ' + totalItems + ' 件　·　贈品 ' + totalGifts + ' 件</div>';
 
   // 商品彙總表
@@ -727,11 +912,16 @@ function exportSummaryXlsx() {
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Worksheet');
 
-  // 檔名：撿貨單_YYYYMMDD.xlsx
-  var d = new Date();
-  var dateStr = d.getFullYear()
-    + String(d.getMonth()+1).padStart(2, '0')
-    + String(d.getDate()).padStart(2, '0');
+  // 檔名：撿貨單_YYYYMMDD.xlsx（使用查詢日期，若無則今天）
+  var dateStr;
+  if (currentQueryDate && /^\d{4}-\d{2}-\d{2}$/.test(currentQueryDate)) {
+    dateStr = currentQueryDate.replace(/-/g, '');
+  } else {
+    var d = new Date();
+    dateStr = d.getFullYear()
+      + String(d.getMonth()+1).padStart(2, '0')
+      + String(d.getDate()).padStart(2, '0');
+  }
   XLSX.writeFile(wb, '撿貨單_' + dateStr + '.xlsx');
 }
 
@@ -2216,6 +2406,20 @@ document.addEventListener("input", function(e) {
 document.getElementById("search-input").addEventListener("keydown", function(e) {
   if (e.key === "Enter") searchTasks();
 });
+
+// 初始化日期選擇器為今天
+(function initDatePicker() {
+  var el = document.getElementById('custom-date');
+  if (!el) return;
+  var d = new Date();
+  var today = d.getFullYear() + '-'
+    + String(d.getMonth()+1).padStart(2, '0') + '-'
+    + String(d.getDate()).padStart(2, '0');
+  el.value = today;
+  el.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') loadShippingByDate();
+  });
+})();
 </script>
 </body>
 </html>

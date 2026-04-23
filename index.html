@@ -106,7 +106,18 @@
 </style>
 </head>
 <body>
-<div class="app">
+<!-- 密碼閘：未登入時顯示，登入後 JS 隱藏 -->
+<div id="login-gate" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;">
+  <div style="max-width:360px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;box-shadow:var(--shadow);">
+    <h1 style="font-size:16px;font-weight:600;letter-spacing:1px;margin-bottom:0.5rem;text-align:center;">🔒 出貨單列印工具</h1>
+    <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-bottom:1.25rem;">請輸入密碼登入</p>
+    <input type="password" id="login-pwd" placeholder="密碼" autocomplete="current-password" style="width:100%;" />
+    <div id="login-error" style="color:var(--danger);font-size:13px;margin-top:8px;min-height:18px;text-align:center;"></div>
+    <button class="primary" id="login-btn" onclick="doLogin()" style="margin-top:10px;">登入</button>
+  </div>
+</div>
+
+<div class="app" id="app-main" style="display:none;">
   <div class="header">
     <h1>出貨單列印工具</h1>
     <p id="today-date"></p>
@@ -142,6 +153,77 @@
 <script>
 document.getElementById("today-date").textContent = new Date().toLocaleDateString("zh-TW",{year:"numeric",month:"2-digit",day:"2-digit"});
 var GAS_URL = "https://script.google.com/macros/s/AKfycbx32ewy-B-1_dJ3NXlFgWI18U6cFFUJh5ILDNtmLDImuzWNg-rSJIYEcMmVTz4Yt8a-Jw/exec";
+
+// ========== 登入閘 ==========
+// 使用 sessionStorage 保持登入狀態，關閉分頁就失效
+function getApiKey() {
+  return sessionStorage.getItem('api_key') || '';
+}
+function setApiKey(k) {
+  sessionStorage.setItem('api_key', k);
+}
+function clearApiKey() {
+  sessionStorage.removeItem('api_key');
+}
+
+async function doLogin() {
+  var pwdEl = document.getElementById('login-pwd');
+  var errEl = document.getElementById('login-error');
+  var btn   = document.getElementById('login-btn');
+  var pwd   = pwdEl.value.trim();
+  if (!pwd) { errEl.textContent = '請輸入密碼'; return; }
+  btn.disabled = true;
+  btn.textContent = '驗證中...';
+  errEl.textContent = '';
+  try {
+    // 密碼驗證通過後，GS 會直接回傳 API_KEY
+    var url = GAS_URL + "?action=verifyPassword&pwd=" + encodeURIComponent(pwd);
+    var res = await fetch(url);
+    var data = await res.json();
+    if (data.ok && data.apiKey) {
+      setApiKey(data.apiKey);
+      showApp();
+    } else {
+      errEl.textContent = '密碼錯誤';
+      btn.disabled = false;
+      btn.textContent = '登入';
+      pwdEl.focus();
+      pwdEl.select();
+    }
+  } catch(e) {
+    errEl.textContent = '驗證失敗：' + e.message;
+    btn.disabled = false;
+    btn.textContent = '登入';
+  }
+}
+
+function showApp() {
+  document.getElementById('login-gate').style.display = 'none';
+  document.getElementById('app-main').style.display = 'block';
+  preloadShippingData();
+}
+
+function showLogin() {
+  document.getElementById('login-gate').style.display = 'flex';
+  document.getElementById('app-main').style.display = 'none';
+  setTimeout(function() {
+    var p = document.getElementById('login-pwd');
+    if (p) p.focus();
+  }, 100);
+}
+
+// 啟動時檢查：若已有 api_key 則直接進入 app，否則顯示登入
+if (getApiKey()) {
+  showApp();
+} else {
+  showLogin();
+}
+
+// Enter 鍵觸發登入
+document.getElementById('login-pwd').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+
 var currentTask = null;
 var currentAddresses = [];
 var shippingTimer = null;
@@ -150,15 +232,22 @@ var SENDER_POSTS = [];         // 寄件郵局列表
 var DEFAULT_POST_IDX = 0;      // 預設寄件郵局的 index
 var SELECTED_POST_IDX = 0;     // 目前選中的寄件郵局 index
 
-// 啟動時預載兩份資料（之後切地址/時間不用再打 API）
-preloadShippingData();
-
+// gasAPI：自動帶上 api_key
 async function gasAPI(params) {
-  var url = GAS_URL + "?" + Object.keys(params).map(function(k) {
-    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+  var withKey = Object.assign({}, params, { key: getApiKey() });
+  var url = GAS_URL + "?" + Object.keys(withKey).map(function(k) {
+    return encodeURIComponent(k) + "=" + encodeURIComponent(withKey[k]);
   }).join("&");
   var res = await fetch(url);
-  return await res.json();
+  var data = await res.json();
+  // 若後端回 Unauthorized，代表 key 過期或被重設，清除並回登入
+  if (data && data.error === 'Unauthorized') {
+    clearApiKey();
+    showLogin();
+    document.getElementById('login-error').textContent = 'Session 已失效，請重新登入';
+    throw new Error('Unauthorized');
+  }
+  return data;
 }
 
 async function preloadShippingData() {

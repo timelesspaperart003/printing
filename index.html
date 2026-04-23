@@ -442,6 +442,7 @@ function printSummary() {
     + ".sub { font-size: 9pt; color: #666; margin-bottom: 4mm; }"
     + "h2 { font-size: 12pt; margin: 6mm 0 2mm; padding-bottom: 1mm; border-bottom: 1.5px solid #333; }"
     + "h2.gift { color: #c00; border-bottom-color: #c00; }"
+    + "h2.page-break { page-break-before: always; margin-top: 0; }"
     + "table { width: 100%; border-collapse: collapse; font-size: 10pt; }"
     + "th, td { border: 1px solid #999; padding: 2mm 3mm; text-align: left; }"
     + "th { background: #eee; font-weight: 600; }"
@@ -480,8 +481,8 @@ function printSummary() {
     body += '</table>';
   }
 
-  // 按訂單明細
-  body += '<h2>按訂單明細</h2>';
+  // 按訂單明細（換頁）
+  body += '<h2 class="page-break">按訂單明細</h2>';
   s.orderBreakdown.forEach(function(ob) {
     var itemCount = ob.items.reduce(function(s,i){return s+i.qty;},0);
     var giftCount = ob.gifts.reduce(function(s,i){return s+i.qty;},0);

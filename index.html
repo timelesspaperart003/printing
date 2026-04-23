@@ -1047,9 +1047,16 @@ function renderProductArea(products) {
       html += '<div class="product-grid">';
       currentTask._gifts.forEach(function(g) {
         html += '<div class="product-card">';
-        html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品</div>';
-        html += '<div class="p-body"><div class="p-name">' + esc(g.name) + '</div>';
-        html += '<div class="p-meta">數量：' + esc(g.qty) + '</div></div>';
+        if (g.isNew) {
+          html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品新</div>';
+          html += '<div class="p-body"><div class="p-name">' + esc(g.name) + '</div>';
+          html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(g.qty) + '</div></div>';
+        } else {
+          if (g.img) html += '<img src="' + g.img + '" alt="">';
+          else html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品</div>';
+          html += '<div class="p-body"><div class="p-name">' + esc(g.name) + '</div>';
+          html += '<div class="p-meta">SKU：' + esc(g.sku || '-') + '<br>📍 ' + esc(g.loc || '-') + '<br>數量：' + esc(g.qty) + '</div></div>';
+        }
         html += '</div>';
       });
       html += '</div></div>';
@@ -1083,9 +1090,17 @@ function renderProductArea(products) {
       html += '<div style="color:#c00;font-weight:700;font-size:15px;margin-bottom:6px;">贈：</div>';
       currentTask._gifts.forEach(function(g) {
         html += '<div class="product-list-item">';
-        html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品</div>';
-        html += '<div class="p-info"><div class="p-name">' + esc(g.name) + '</div>';
-        html += '<div class="p-meta">數量：' + esc(g.qty) + '</div></div>';
+        if (g.isNew) {
+          html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品新</div>';
+          html += '<div class="p-info"><div class="p-name">' + esc(g.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(g.qty) + '</div></div>';
+        } else {
+          if (g.img) html += '<img src="' + g.img + '" alt="">';
+          else html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品</div>';
+          html += '<div class="p-info">';
+          html += '<div class="p-name">' + esc(g.name) + '</div>';
+          html += '<div class="p-meta">SKU：' + esc(g.sku || '-') + '　📍 ' + esc(g.loc || '-') + '　數量：' + esc(g.qty) + '</div>';
+          html += '</div>';
+        }
         html += '</div>';
       });
       html += '</div>';
@@ -1253,9 +1268,17 @@ function doPrint() {
       html += "<div style='color:#c00;font-weight:700;font-size:" + Math.round(cardFontMd*1.3) + "pt;margin-bottom:4px;'>贈：</div>";
       currentTask._gifts.forEach(function(g) {
         html += "<div style='display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #f5f5f5;'>";
-        html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#fff0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>贈品</div>";
-        html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;'>" + esc(g.name) + "</div>";
-        html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(g.qty) + "</div></div></div>";
+        if (g.isNew) {
+          html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#fff0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>贈品新</div>";
+          html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;'>" + esc(g.name) + "</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(g.qty) + "</div></div></div>";
+        } else {
+          if (g.img) html += "<img src='" + g.img + "' style='width:" + listImgSize + "px;height:" + listImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
+          else html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#fff0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>贈品</div>";
+          html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;'>" + esc(g.name) + "</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(g.sku || '-') + "　📍 " + esc(g.loc || '-') + "　數量：" + esc(g.qty) + "</div></div></div>";
+        }
       });
       html += "</div>";
     }

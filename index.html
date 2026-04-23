@@ -1295,8 +1295,10 @@ function doPrint() {
     ".cod-row-2 > span { flex: 1; }",
     ".cod-sec-recv { display: flex; gap: 2mm; align-items: stretch; }",
     ".cod-recv-left { flex: 1; }",
-    ".cod-postage-paid { width: 20mm; border: 1.2px solid #000; text-align: center; padding: 2mm 1mm; font-weight: 600; font-size: 8pt; display: flex; align-items: center; justify-content: center; line-height: 1.3; }",
-    ".cod-top-blank { width: 28mm; min-height: 18mm; border: 1.2px solid #000; flex-shrink: 0; }",
+    ".cod-postage-paid { width: 20mm; border: 1.2px solid #000; text-align: center; padding: 2mm 1mm; font-weight: 600; font-size: 8pt; display: flex; align-items: center; justify-content: center; line-height: 1.3; flex-shrink: 0; }",
+    ".cod-top-blank { width: 38mm; min-height: 32mm; border: 1.2px solid #000; flex-shrink: 0; }",
+    ".cod-fees-cell { padding: 1.2mm 2mm !important; text-align: left !important; font-size: 7.5pt !important; line-height: 1.7 !important; }",
+    ".cod-fees-cell > div { padding: 0.2mm 0; }",
     ".cod-zip { display: inline-table; border-collapse: collapse; vertical-align: middle; }",
     ".cod-zip td { border: 1px solid #333; width: 5mm; height: 5mm; text-align: center; font-size: 9pt; }",
     ".cod-items-table { width: 100%; border-collapse: collapse; margin-top: 0.8mm; }",
@@ -1465,8 +1467,8 @@ function doPrint() {
         + "</div>"
       ) : '';
 
-      // 國內郵資已付：只有第一聯有
-      var postagePaidBox = copyNum === 1 ?
+      // 國內郵資已付：只有第一聯有，放在收件人區左側
+      var postagePaidLeft = copyNum === 1 ?
         "<div class='cod-postage-paid'>國內<br>郵資已付</div>" : '';
 
       return ""
@@ -1481,54 +1483,57 @@ function doPrint() {
         + "  </div>"
         // 右側主內容
         + "  <div class='cod-main'>"
-        // 寄件人區 + 右上空白格子（兩聯都有）
-        + "    <div class='cod-sec' style='display:flex;gap:3mm;align-items:flex-start;'>"
-        + "      <div style='flex:1;'>"
-        + "        <div class='cod-row-2'>"
-        + "          <span>寄件人姓名：<b>雋永紙藝</b></span>"
-        + "          <span>電話：<b>0961-561-234 / 062-052-140</b></span>"
+        // 上半：左邊寄件人+收件人，右邊大空白框（跨 2 段高度）
+        + "    <div style='display:flex;gap:2mm;align-items:stretch;'>"
+        + "      <div style='flex:1;min-width:0;'>"
+        // 寄件人
+        + "        <div class='cod-sec'>"
+        + "          <div class='cod-row-2'>"
+        + "            <span>寄件人姓名：<b>雋永紙藝</b></span>"
+        + "            <span>電話：<b>0961-561-234 / 062-052-140</b></span>"
+        + "          </div>"
+        + "          <div class='cod-row'>詳細地址：<b>台南市仁德區太子五街22巷1號</b></div>"
+        +            depositFields
         + "        </div>"
-        + "        <div class='cod-row'>詳細地址：<b>台南市仁德區太子五街22巷1號</b></div>"
-        +          depositFields
+        // 收件人（國內郵資已付在左側，僅第一聯）
+        + "        <div class='cod-sec cod-sec-recv'>"
+        +            postagePaidLeft
+        + "          <div class='cod-recv-left'>"
+        + "            <div class='cod-row'>收件人　郵遞區號：<table class='cod-zip'><tr>" + codZipCells(recvZip2, 3) + "</tr></table></div>"
+        + "            <div class='cod-row'>　　　　地址：<b>" + esc(recvAddrClean2) + "</b></div>"
+        + "            <div class='cod-row-2'>"
+        + "              <span>姓名：<b>" + esc(recvName2) + "</b></span>"
+        + "              <span>電話：<b>" + esc(recvPhone2) + "</b></span>"
+        + "            </div>"
+        + "            <div class='cod-row'>快捷希望送達時段：<b>☑ 白天(0900-1800)　☐ 晚上(1800-2100)</b></div>"
+        + "          </div>"
+        + "        </div>"
         + "      </div>"
+        // 右側大空白框（跟連皮重量/尺寸對齊的寬度）
         + "      <div class='cod-top-blank'></div>"
         + "    </div>"
-        // 收件人區 + 國內郵資已付（僅第一聯）
-        + "    <div class='cod-sec cod-sec-recv'>"
-        + "      <div class='cod-recv-left'>"
-        + "        <div class='cod-row'>收件人　郵遞區號：<table class='cod-zip'><tr>" + codZipCells(recvZip2, 3) + "</tr></table></div>"
-        + "        <div class='cod-row'>　　　　地址：<b>" + esc(recvAddrClean2) + "</b></div>"
-        + "        <div class='cod-row-2'>"
-        + "          <span>姓名：<b>" + esc(recvName2) + "</b></span>"
-        + "          <span>電話：<b>" + esc(recvPhone2) + "</b></span>"
-        + "        </div>"
-        + "        <div class='cod-row'>快捷希望送達時段：<b>☑ 白天(0900-1800)　☐ 晚上(1800-2100)</b></div>"
-        + "      </div>"
-        +        postagePaidBox
-        + "    </div>"
-        // 商品表
+        // 商品表（連皮+公斤合併欄，下方跨欄郵資/代收貨款費/共計）
         + "    <table class='cod-items-table'>"
         + "      <tr>"
-        + "        <th style='width:30%;'>內裝物品名稱</th>"
-        + "        <th style='width:13%;'>價值(元)</th>"
-        + "        <th style='width:17%;'>代收金額(元)</th>"
-        + "        <th style='width:25%;'>速皮重量／尺寸</th>"
-        + "        <th style='width:15%;'>公斤／公分</th>"
+        + "        <th style='width:28%;'>內裝物品名稱</th>"
+        + "        <th style='width:14%;'>價值(元)</th>"
+        + "        <th style='width:16%;'>代收金額(元)</th>"
+        + "        <th style='width:42%;'>連皮重量／尺寸　　公斤／公分</th>"
         + "      </tr>"
         + "      <tr>"
-        + "        <td><b>紙藝品</b></td>"
-        + "        <td></td>"
-        + "        <td class='cod-amt'>" + (codAmountArabic ? "<b>" + esc(codAmountArabic) + "</b>" : "") + "</td>"
-        + "        <td></td>"
-        + "        <td></td>"
+        + "        <td rowspan='2'><b>紙藝品</b></td>"
+        + "        <td rowspan='2'></td>"
+        + "        <td rowspan='2' class='cod-amt'>" + (codAmountArabic ? "<b>$" + esc(codAmountArabic) + "</b>" : "") + "</td>"
+        + "        <td style='height:7mm;'></td>"
+        + "      </tr>"
+        + "      <tr>"
+        + "        <td class='cod-fees-cell'>"
+        + "          <div>郵資：<span class='cod-fill'></span>元</div>"
+        + "          <div>代收貨款費：<span class='cod-fill'></span>元</div>"
+        + "          <div>共計：<span class='cod-fill'></span>元</div>"
+        + "        </td>"
         + "      </tr>"
         + "    </table>"
-        // 郵資 / 代收貨款費 / 共計
-        + "    <div class='cod-fees'>"
-        + "      <span>郵資：<span class='cod-fill'></span></span>"
-        + "      <span>代收貨款費：<span class='cod-fill'></span></span>"
-        + "      <span>共計：<span class='cod-fill'></span>元</span>"
-        + "    </div>"
         // 約定事項 + 無法投遞處理方式
         + "    <div class='cod-bottom'>"
         + "      <div class='cod-agreement'>"

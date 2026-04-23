@@ -104,6 +104,8 @@
 
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+<!-- SheetJS for Excel export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <!-- 密碼閘：未登入時顯示，登入後 JS 隱藏 -->
@@ -404,8 +406,9 @@ async function loadTodaySummary() {
     detailResults.forEach(function(r) {
       // 優先用 detail API 回的 contactNotionName，退回用 task 帶過來的
       var contact = (r.detail && r.detail.contactNotionName) || r.task.contactNotionName || '';
+      var pageId = r.task.id || '';
       if (!r.detail || r.detail.error) {
-        orderBreakdown.push({ title: r.task.title, contact: contact, items: [], gifts: [], error: true });
+        orderBreakdown.push({ title: r.task.title, pageId: pageId, contact: contact, items: [], gifts: [], error: true });
         return;
       }
       var parsed = parseItemText(cleanItemText(r.detail.itemText || ""));
@@ -421,7 +424,7 @@ async function loadTodaySummary() {
         giftAgg[g.name] = (giftAgg[g.name] || 0) + q;
         obGifts.push({ name: g.name, qty: q });
       });
-      orderBreakdown.push({ title: r.task.title, contact: contact, items: obItems, gifts: obGifts, error: false });
+      orderBreakdown.push({ title: r.task.title, pageId: pageId, contact: contact, items: obItems, gifts: obGifts, error: false });
     });
 
     // 抓商品資料（SKU、位置、圖片）
@@ -472,9 +475,10 @@ function renderSummary(agg, giftAgg, orderBreakdown, productInfo) {
   html += '<div style="font-size:12px;color:var(--text-muted);">' + esc(today) + '　·　' + orderBreakdown.length + ' 筆訂單　·　商品 ' + totalItemsQty + ' 件　·　贈品 ' + totalGiftsQty + ' 件</div>';
   html += '</div>';
 
-  // 列印 / 返回按鈕
+  // 列印 / 匯出按鈕
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
   html += '<button onclick="printSummary()" style="flex:1;background:var(--accent);color:#fff;border-color:var(--accent);padding:10px;">🖨️ 列印此清單</button>';
+  html += '<button onclick="exportSummaryXlsx()" style="flex:1;background:#1e7e34;color:#fff;border-color:#1e7e34;padding:10px;">📊 匯出撿貨單 Excel</button>';
   html += '</div>';
 
   // ===== 一般商品彙總 =====
@@ -623,6 +627,89 @@ function printSummary() {
   var win = window.open("", "_blank", "width=800,height=700");
   win.document.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>今日出貨清單</title><style>" + css + "</style></head><body>" + body + "<scr"+"ipt>window.onload=function(){window.print();}</"+"script></body></html>");
   win.document.close();
+}
+
+/**
+ * 匯出撿貨單 Excel（符合匯入模板欄位格式）
+ * 欄位：# / Name / Variant / SKU / iSKU / Qty / Rack / Order ID
+ *   - 一張訂單 → 多列（每個商品一列）
+ *   - 贈品也算進去
+ *   - Order ID 用 pageId 前 8 碼（便於短且可識別）
+ */
+function exportSummaryXlsx() {
+  var s = window._lastSummary;
+  if (!s) { alert('無資料可匯出'); return; }
+  if (typeof XLSX === 'undefined') {
+    alert('Excel 函式庫尚未載入，請稍等或重新整理頁面');
+    return;
+  }
+
+  var rows = [];
+  var counter = 1;
+
+  s.orderBreakdown.forEach(function(ob) {
+    if (ob.error) return;
+    var orderId = ob.pageId || '';
+    // 一般商品
+    ob.items.forEach(function(it) {
+      var p = s.productInfo[it.name] || {};
+      rows.push({
+        '#': counter++,
+        'Name': it.name,
+        'Variant': '',
+        'SKU': (p.sku || '').trim(),
+        'iSKU': (p.sku || '').trim(),
+        'Qty': it.qty,
+        'Rack': (p.loc || '').trim(),
+        'Order ID': orderId
+      });
+    });
+    // 贈品
+    ob.gifts.forEach(function(g) {
+      var p = s.productInfo[g.name] || {};
+      rows.push({
+        '#': counter++,
+        'Name': g.name + '（贈品）',
+        'Variant': '',
+        'SKU': (p.sku || '').trim(),
+        'iSKU': (p.sku || '').trim(),
+        'Qty': g.qty,
+        'Rack': (p.loc || '').trim(),
+        'Order ID': orderId
+      });
+    });
+  });
+
+  if (rows.length === 0) {
+    alert('沒有可匯出的商品');
+    return;
+  }
+
+  // 指定欄位順序
+  var header = ['#', 'Name', 'Variant', 'SKU', 'iSKU', 'Qty', 'Rack', 'Order ID'];
+  var ws = XLSX.utils.json_to_sheet(rows, { header: header });
+
+  // 欄寬
+  ws['!cols'] = [
+    { wch: 5 },   // #
+    { wch: 28 },  // Name
+    { wch: 10 },  // Variant
+    { wch: 14 },  // SKU
+    { wch: 14 },  // iSKU
+    { wch: 6 },   // Qty
+    { wch: 10 },  // Rack
+    { wch: 38 }   // Order ID (完整 pageId 36 字元)
+  ];
+
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Worksheet');
+
+  // 檔名：撿貨單_YYYYMMDD.xlsx
+  var d = new Date();
+  var dateStr = d.getFullYear()
+    + String(d.getMonth()+1).padStart(2, '0')
+    + String(d.getDate()).padStart(2, '0');
+  XLSX.writeFile(wb, '撿貨單_' + dateStr + '.xlsx');
 }
 
 function backFromSummary() {

@@ -1296,6 +1296,7 @@ function doPrint() {
     ".cod-sec-recv { display: flex; gap: 2mm; align-items: stretch; }",
     ".cod-recv-left { flex: 1; }",
     ".cod-postage-paid { width: 20mm; border: 1.2px solid #000; text-align: center; padding: 2mm 1mm; font-weight: 600; font-size: 8pt; display: flex; align-items: center; justify-content: center; line-height: 1.3; }",
+    ".cod-top-blank { width: 28mm; min-height: 18mm; border: 1.2px solid #000; flex-shrink: 0; }",
     ".cod-zip { display: inline-table; border-collapse: collapse; vertical-align: middle; }",
     ".cod-zip td { border: 1px solid #333; width: 5mm; height: 5mm; text-align: center; font-size: 9pt; }",
     ".cod-items-table { width: 100%; border-collapse: collapse; margin-top: 0.8mm; }",
@@ -1455,14 +1456,18 @@ function doPrint() {
     // 建構一聯（第一聯 / 第二聯）的共用內容
     function buildCodCopy(copyNum) {
       var copyLabel = copyNum === 1 ? '（第一聯　收件人收存聯）' : '（第二聯　投遞局聯）';
-      // 第二聯才有劃撥 / 存簿儲金帳號
+      // 第二聯才有劃撥 / 存簿儲金帳號（劃撥帳號後方不留底線）
       var depositFields = copyNum === 2 ? (
-          "<div class='cod-row'>寄件人郵政劃撥帳號：<span class='cod-fill' style='min-width:30mm;'></span></div>"
+          "<div class='cod-row'>寄件人郵政劃撥帳號：</div>"
         + "<div class='cod-row-2'>"
         +   "<span>入戶匯款局號：<b>003159-1</b></span>"
         +   "<span>存簿儲金帳號：<b>059723-2</b></span>"
         + "</div>"
       ) : '';
+
+      // 國內郵資已付：只有第一聯有
+      var postagePaidBox = copyNum === 1 ?
+        "<div class='cod-postage-paid'>國內<br>郵資已付</div>" : '';
 
       return ""
         + "<div class='cod-copy'>"
@@ -1476,16 +1481,19 @@ function doPrint() {
         + "  </div>"
         // 右側主內容
         + "  <div class='cod-main'>"
-        // 寄件人區
-        + "    <div class='cod-sec'>"
-        + "      <div class='cod-row-2'>"
-        + "        <span>寄件人姓名：<b>雋永紙藝</b></span>"
-        + "        <span>電話：<b>0961-561-234 / 062-052-140</b></span>"
+        // 寄件人區 + 右上空白格子（兩聯都有）
+        + "    <div class='cod-sec' style='display:flex;gap:3mm;align-items:flex-start;'>"
+        + "      <div style='flex:1;'>"
+        + "        <div class='cod-row-2'>"
+        + "          <span>寄件人姓名：<b>雋永紙藝</b></span>"
+        + "          <span>電話：<b>0961-561-234 / 062-052-140</b></span>"
+        + "        </div>"
+        + "        <div class='cod-row'>詳細地址：<b>台南市仁德區太子五街22巷1號</b></div>"
+        +          depositFields
         + "      </div>"
-        + "      <div class='cod-row'>詳細地址：<b>台南市仁德區太子五街22巷1號</b></div>"
-        +        depositFields
+        + "      <div class='cod-top-blank'></div>"
         + "    </div>"
-        // 收件人區 + 國內郵資已付
+        // 收件人區 + 國內郵資已付（僅第一聯）
         + "    <div class='cod-sec cod-sec-recv'>"
         + "      <div class='cod-recv-left'>"
         + "        <div class='cod-row'>收件人　郵遞區號：<table class='cod-zip'><tr>" + codZipCells(recvZip2, 3) + "</tr></table></div>"
@@ -1496,7 +1504,7 @@ function doPrint() {
         + "        </div>"
         + "        <div class='cod-row'>快捷希望送達時段：<b>☑ 白天(0900-1800)　☐ 晚上(1800-2100)</b></div>"
         + "      </div>"
-        + "      <div class='cod-postage-paid'>國內<br>郵資已付</div>"
+        +        postagePaidBox
         + "    </div>"
         // 商品表
         + "    <table class='cod-items-table'>"
@@ -1565,25 +1573,23 @@ function doPrint() {
       //   左半：劃撥存款單
       +     "<div class='cod-deposit-form'>"
       +       "<div class='cod-deposit-title'>代收貨款郵件　劃撥存款單／存簿匯款</div>"
-      +       "<div class='cod-deposit-row'>收款帳戶　　局號：________________</div>"
-      +       "<div class='cod-deposit-row'>　　　　　　戶名：________________</div>"
-      +       "<div class='cod-deposit-row'>代收金額：新台幣 ________________</div>"
+      +       "<div class='cod-deposit-row'>收款帳戶　　局號：<b>003159-1</b>　　帳號：<b>059723-2</b></div>"
+      +       "<div class='cod-deposit-row'>　　　　　　戶名：<b>楊雅晴</b></div>"
+      +       "<div class='cod-deposit-row'>代收金額：新台幣 <b>" + (codAmountChinese || '________________') + "</b></div>"
       +       "<div class='cod-deposit-row cod-deposit-box'>寄款人資料</div>"
       +       "<div class='cod-deposit-row cod-deposit-box cod-deposit-box-tall'>機器印證欄</div>"
-      +       "<div class='cod-deposit-row'>金額：________________</div>"
+      +       "<div class='cod-deposit-row'>金額：<b>" + (codAmountArabic ? "$" + codAmountArabic : '________________') + "</b></div>"
       +     "</div>"
       //   右半：收據
       +     "<div class='cod-receipt'>"
       +       "<div class='cod-deposit-title'>代收貨款郵件　劃撥存款／存簿匯款 收據</div>"
-      +       "<div class='cod-deposit-row'>帳號及戶名：________________</div>"
-      +       "<div class='cod-deposit-row'>金額：________________</div>"
+      +       "<div class='cod-deposit-row'>帳號及戶名：<b>003159-1 / 059723-2　楊雅晴</b></div>"
+      +       "<div class='cod-deposit-row'>金額：<b>" + (codAmountArabic ? "$" + codAmountArabic : '________________') + "</b></div>"
       +       "<div class='cod-deposit-row cod-deposit-box'>機器印證欄</div>"
       +       "<div class='cod-deposit-row cod-deposit-box cod-deposit-box-tall' style='text-align:center;'>經辦局章戳</div>"
       +     "</div>"
       +   "</div>"
       + "</div>"
-      // 顯示代收金額國字大寫（給店員參考，若需要可填入上方欄位）
-      + (codAmountChinese ? "<div style='margin-top:2mm;padding:2mm 3mm;background:#fff3e0;border:1px dashed #e65100;color:#c00;font-weight:600;font-size:9pt;'>💡 代收金額國字大寫：<b>" + esc(codAmountChinese) + "</b>　($" + esc(codAmountArabic) + ")</div>" : "")
       + "</div>";
   } else {
     // ============ 普通掛號運送單 ============

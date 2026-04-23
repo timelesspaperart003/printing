@@ -560,6 +560,7 @@ function printSummary() {
 
   var css = "@page { size: A4 portrait; margin: 12mm; }"
     + "* { box-sizing: border-box; margin: 0; padding: 0; }"
+    + "html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }"
     + "body { font-family: 'Microsoft JhengHei', sans-serif; color: #111; font-size: 10pt; }"
     + "h1 { font-size: 16pt; font-weight: 700; border-bottom: 2px solid #000; padding-bottom: 4mm; margin-bottom: 2mm; }"
     + ".sub { font-size: 9pt; color: #666; margin-bottom: 4mm; }"
@@ -567,12 +568,16 @@ function printSummary() {
     + "h2.gift { color: #c00; border-bottom-color: #c00; }"
     + "h2.page-break { page-break-before: always; margin-top: 0; }"
     + "table { width: 100%; border-collapse: collapse; font-size: 10pt; }"
-    + "th, td { border: 1px solid #999; padding: 2mm 3mm; text-align: left; }"
+    + "th, td { border: 1px solid #999; padding: 2mm 3mm; text-align: left; vertical-align: middle; }"
     + "th { background: #eee; font-weight: 600; }"
-    + "td.qty { text-align: right; font-weight: 700; font-size: 11pt; width: 15%; }"
+    + "td.qty { text-align: right; font-weight: 700; font-size: 11pt; width: 12%; }"
     + "td.qty.gift { color: #c00; }"
-    + "td.loc { width: 18%; }"
-    + "td.sku { width: 18%; color: #666; font-size: 9pt; }"
+    + "td.loc { width: 14%; }"
+    + "td.sku { width: 16%; color: #666; font-size: 9pt; }"
+    + "td.img-cell { width: 18mm; text-align: center; padding: 1.5mm; }"
+    + "td.img-cell img { width: 14mm; height: 14mm; object-fit: cover; border-radius: 2mm; display: block; margin: 0 auto; }"
+    + "td.img-cell .no-img { width: 14mm; height: 14mm; background: #f5f5f5; border-radius: 2mm; display: flex; align-items: center; justify-content: center; font-size: 7pt; color: #aaa; margin: 0 auto; }"
+    + "td.img-cell .no-img.gift { background: #fff0f0; color: #c00; }"
     + ".order-block { margin-top: 4mm; padding: 2mm 3mm; border: 1px solid #ccc; border-radius: 2mm; page-break-inside: avoid; }"
     + ".order-title { font-weight: 600; font-size: 10pt; margin-bottom: 1mm; }"
     + ".order-items { font-size: 9pt; line-height: 1.6; }"
@@ -585,10 +590,19 @@ function printSummary() {
   body += '<h2>商品彙總</h2>';
   if (s.aggNames.length === 0) body += '<div>（無）</div>';
   else {
-    body += '<table><tr><th>商品名稱</th><th class="sku">SKU</th><th class="loc">📍 位置</th><th class="qty">數量</th></tr>';
+    body += '<table><tr><th style="width:18mm;">圖</th><th>商品名稱</th><th class="sku">SKU</th><th class="loc">📍 位置</th><th class="qty">數量</th></tr>';
     s.aggNames.forEach(function(n) {
       var p = s.productInfo[n] || {};
-      body += '<tr><td>' + esc(n) + '</td><td class="sku">' + esc(p.sku || '-') + '</td><td class="loc">' + esc(p.loc || '-') + '</td><td class="qty">× ' + s.agg[n] + '</td></tr>';
+      var imgCell = p.img
+        ? '<img src="' + p.img + '" alt="">'
+        : '<div class="no-img">' + (p.isNew ? '新品' : '無圖') + '</div>';
+      body += '<tr>'
+        + '<td class="img-cell">' + imgCell + '</td>'
+        + '<td>' + esc(n) + '</td>'
+        + '<td class="sku">' + esc(p.sku || '-') + '</td>'
+        + '<td class="loc">' + esc(p.loc || '-') + '</td>'
+        + '<td class="qty">× ' + s.agg[n] + '</td>'
+        + '</tr>';
     });
     body += '</table>';
   }
@@ -596,10 +610,19 @@ function printSummary() {
   // 贈品彙總表
   if (s.giftNames.length > 0) {
     body += '<h2 class="gift">贈品彙總</h2>';
-    body += '<table><tr><th>贈品名稱</th><th class="sku">SKU</th><th class="loc">📍 位置</th><th class="qty">數量</th></tr>';
+    body += '<table><tr><th style="width:18mm;">圖</th><th>贈品名稱</th><th class="sku">SKU</th><th class="loc">📍 位置</th><th class="qty">數量</th></tr>';
     s.giftNames.forEach(function(n) {
       var p = s.productInfo[n] || {};
-      body += '<tr><td>' + esc(n) + '</td><td class="sku">' + esc(p.sku || '-') + '</td><td class="loc">' + esc(p.loc || '-') + '</td><td class="qty gift">× ' + s.giftAgg[n] + '</td></tr>';
+      var imgCell = p.img
+        ? '<img src="' + p.img + '" alt="">'
+        : '<div class="no-img gift">' + (p.isNew ? '贈品新' : '贈品') + '</div>';
+      body += '<tr>'
+        + '<td class="img-cell">' + imgCell + '</td>'
+        + '<td>' + esc(n) + '</td>'
+        + '<td class="sku">' + esc(p.sku || '-') + '</td>'
+        + '<td class="loc">' + esc(p.loc || '-') + '</td>'
+        + '<td class="qty gift">× ' + s.giftAgg[n] + '</td>'
+        + '</tr>';
     });
     body += '</table>';
   }

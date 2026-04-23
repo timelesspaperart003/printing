@@ -266,6 +266,7 @@ function cleanItemText(text) {
 //   - 加「贈品模式」：遇到 `贈` 開頭的行就進入贈品模式，後續 *N 行都算贈品
 //   - 修掉 `贈：` 獨佔一行會 push 空贈品的 bug
 //   - 容許 `* 1`（星號後有空格）的寫法
+//   - [v3.2 修] payment 偵測擴充：到付/貨到付款/需收/需收款/尾款/免收款/$數字 都算 payment
 function parseItemText(text) {
   if (!text) return { items: [], gifts: [], notes: [], payment: "" };
   var lines = text.split("\n");
@@ -274,14 +275,14 @@ function parseItemText(text) {
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     if (!line) continue;
-    // 有 *數字 → 切到 *數字結尾
+    // 有 *數字 → 切到 *數字結尾（並記錄這行本來就含 *N）
     var qtyMatch = line.match(/\*\s*\d+/);
     if (qtyMatch) {
       line = line.substring(0, qtyMatch.index + qtyMatch[0].length).trim();
     }
     if (!line) continue;
-    // 需收款/免收款 → payment，離開贈品模式
-    if (/需收款|免收款/.test(line)) {
+    // 款項偵測（僅限沒 *N 的行）：避免商品名稱含 $ 被誤判
+    if (!qtyMatch && (/需收款|需收|免收款|貨到付款|到付|尾款/.test(line) || /\$\s*\d+/.test(line))) {
       payment = line;
       inGiftMode = false;
       continue;

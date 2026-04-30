@@ -2251,7 +2251,7 @@ function doPrint() {
     + "<tr><td class='lbl'>地址：</td><td class='val' colspan='3'>" + esc(addrText) + "</td></tr>"
     + "<tr><td class='lbl'>商品數：</td><td class='val'>" + totalCount + " 件</td><td class='lbl' style='padding-left:6px;'>出貨人員：</td><td class='val'>" + esc(staffText) + "</td></tr>"
     + "<tr><td class='lbl'>備註：</td><td class='val' colspan='3' style='color:#444;'>" + esc((currentTask._notes && currentTask._notes.length > 0) ? currentTask._notes.join('　') : '') + "</td></tr>"
-    + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val'></td><td class='lbl' style='padding-left:6px;color:#c00;font-weight:700;'>款項：</td><td class='val' style='color:#c00;font-weight:700;'>" + esc(paymentCellText) + "</td></tr>"
+    + "<tr><td class='lbl' style='height:40px;'>客戶簽收：</td><td class='val'></td><td class='val' colspan='2' style='color:#c00;font-weight:700;'>" + esc(paymentCellText) + "</td></tr>"
     + "</table>"
     + "<hr class='dashed'>"
     + "<div class='items-label'>商品內容</div>"

@@ -539,9 +539,10 @@ async function loadTodaySummary(displayLabel, mode) {
     });
     var detailResults = await Promise.all(detailPromises);
 
-    // 彙整：{ name -> { qty, tasks: [{title, qty}] } }
-    var agg = {};           // 一般商品
+    // 彙整：{ name -> qty }
+    var agg = {};           // 一般商品（含補寄、不含退貨）
     var giftAgg = {};       // 贈品
+    var returnAgg = {};     // 退貨
     var orderBreakdown = [];// 訂單明細
 
     detailResults.forEach(function(r) {
@@ -549,7 +550,7 @@ async function loadTodaySummary(displayLabel, mode) {
       var contact = (r.detail && r.detail.contactNotionName) || r.task.contactNotionName || '';
       var pageId = r.task.id || '';
       if (!r.detail || r.detail.error) {
-        orderBreakdown.push({ title: r.task.title, pageId: pageId, contact: contact, items: [], gifts: [], error: true });
+        orderBreakdown.push({ title: r.task.title, pageId: pageId, contact: contact, items: [], gifts: [], returns: [], returnReason: '', error: true });
         return;
       }
       var parsed = parseItemText(cleanItemText(r.detail.itemText || ""));
@@ -565,13 +566,25 @@ async function loadTodaySummary(displayLabel, mode) {
         giftAgg[g.name] = (giftAgg[g.name] || 0) + q;
         obGifts.push({ name: g.name, qty: q });
       });
-      orderBreakdown.push({ title: r.task.title, pageId: pageId, contact: contact, items: obItems, gifts: obGifts, error: false });
+      var obReturns = [];
+      (parsed.returns || []).forEach(function(rt) {
+        var q = parseInt(rt.qty) || 0;
+        returnAgg[rt.name] = (returnAgg[rt.name] || 0) + q;
+        obReturns.push({ name: rt.name, qty: q });
+      });
+      orderBreakdown.push({
+        title: r.task.title, pageId: pageId, contact: contact,
+        items: obItems, gifts: obGifts, returns: obReturns,
+        returnReason: parsed.returnReason || '',
+        error: false
+      });
     });
 
-    // 抓商品資料（SKU、位置、圖片）
+    // 抓商品資料（SKU、位置、圖片）— 包含退貨商品也要查
     var allUnique = [];
     Object.keys(agg).forEach(function(n) { allUnique.push({ name: n, qty: agg[n], isGift: false }); });
     Object.keys(giftAgg).forEach(function(n) { allUnique.push({ name: n, qty: giftAgg[n], isGift: true }); });
+    Object.keys(returnAgg).forEach(function(n) { allUnique.push({ name: n, qty: returnAgg[n], isReturn: true }); });
 
     var productInfo = {};  // name -> {sku, loc, img, isNew}
     if (allUnique.length > 0) {
@@ -587,13 +600,13 @@ async function loadTodaySummary(displayLabel, mode) {
       } catch(e) { /* 失敗就沒有商品資料，繼續顯示 */ }
     }
 
-    renderSummary(agg, giftAgg, orderBreakdown, productInfo);
+    renderSummary(agg, giftAgg, returnAgg, orderBreakdown, productInfo);
   } catch(e) {
     summaryEl.innerHTML = '<div class="status error">彙整失敗：' + esc(e.message) + '</div>';
   }
 }
 
-function renderSummary(agg, giftAgg, orderBreakdown, productInfo) {
+function renderSummary(agg, giftAgg, returnAgg, orderBreakdown, productInfo) {
   var summaryEl = document.getElementById("summary-content");
   var today = new Date().toLocaleDateString("zh-TW", {year:"numeric", month:"2-digit", day:"2-digit"});
 
@@ -608,13 +621,18 @@ function renderSummary(agg, giftAgg, orderBreakdown, productInfo) {
 
   var aggNames = sortByLoc(Object.keys(agg));
   var giftNames = sortByLoc(Object.keys(giftAgg));
+  var returnNames = sortByLoc(Object.keys(returnAgg));
   var totalItemsQty = aggNames.reduce(function(s, n) { return s + agg[n]; }, 0);
   var totalGiftsQty = giftNames.reduce(function(s, n) { return s + giftAgg[n]; }, 0);
+  var totalReturnsQty = returnNames.reduce(function(s, n) { return s + returnAgg[n]; }, 0);
 
   var label = window._summaryDateLabel || '今日';
   var html = '<div style="margin-bottom:12px;">';
   html += '<h2 style="font-size:16px;margin-bottom:4px;">📋 ' + esc(label) + '出貨商品總清單</h2>';
-  html += '<div style="font-size:12px;color:var(--text-muted);">' + esc(today) + '　·　' + orderBreakdown.length + ' 筆訂單　·　商品 ' + totalItemsQty + ' 件　·　贈品 ' + totalGiftsQty + ' 件</div>';
+  var subParts = [esc(today), orderBreakdown.length + ' 筆訂單', '商品 ' + totalItemsQty + ' 件'];
+  if (totalGiftsQty > 0) subParts.push('贈品 ' + totalGiftsQty + ' 件');
+  if (totalReturnsQty > 0) subParts.push('<span style="color:#c00;">退貨 ' + totalReturnsQty + ' 件</span>');
+  html += '<div style="font-size:12px;color:var(--text-muted);">' + subParts.join('　·　') + '</div>';
   html += '</div>';
 
   // 列印 / 匯出按鈕
@@ -663,17 +681,42 @@ function renderSummary(agg, giftAgg, orderBreakdown, productInfo) {
     html += '</div>';
   }
 
+  // ===== 退貨彙總 =====
+  if (returnNames.length > 0) {
+    html += '<div style="font-weight:600;font-size:14px;margin:16px 0 6px;border-bottom:3px solid #c00;padding-bottom:4px;color:#c00;background:#fff5f5;padding-left:6px;border-radius:3px 3px 0 0;">⚠ 退貨彙總</div>';
+    html += '<div class="product-list" style="background:#fff5f5;border:1px solid #ffcdd2;border-top:none;padding:6px;border-radius:0 0 6px 6px;">';
+    returnNames.forEach(function(name) {
+      var p = productInfo[name] || {};
+      html += '<div class="product-list-item">';
+      if (p.img) html += '<img src="' + p.img + '" alt="">';
+      else html += '<div class="no-img" style="background:#ffebee;color:#c00;">退</div>';
+      html += '<div class="p-info">';
+      html += '<div class="p-name" style="color:#c00;">' + esc(name) + '</div>';
+      html += '<div class="p-meta">SKU：' + esc(p.sku || '-') + '　📍 ' + esc(p.loc || '-') + '</div>';
+      html += '</div>';
+      html += '<div style="font-size:18px;font-weight:700;color:#c00;margin-left:auto;padding-left:12px;">× ' + returnAgg[name] + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
   // ===== 按訂單明細（摺疊） =====
   html += '<div style="font-weight:600;font-size:14px;margin:16px 0 6px;border-bottom:1px solid var(--border);padding-bottom:4px;">按訂單明細</div>';
   orderBreakdown.forEach(function(ob, idx) {
     var itemCount = ob.items.reduce(function(s,i){return s+i.qty;},0);
     var giftCount = ob.gifts.reduce(function(s,i){return s+i.qty;},0);
-    html += '<details style="margin-bottom:6px;border:1px solid var(--border);border-radius:6px;padding:8px;">';
+    var returnCount = (ob.returns || []).reduce(function(s,i){return s+i.qty;},0);
+    html += '<details style="margin-bottom:6px;border:1px solid ' + (returnCount > 0 ? '#ffcdd2' : 'var(--border)') + ';border-radius:6px;padding:8px;' + (returnCount > 0 ? 'background:#fffafa;' : '') + '">';
     html += '<summary style="cursor:pointer;font-weight:500;font-size:13px;">';
     if (ob.contact) html += '<span style="color:#1976d2;font-weight:600;">👤 ' + esc(ob.contact) + '</span>　';
     html += esc(ob.title);
     if (ob.error) html += ' <span style="color:#c00;">（讀取失敗）</span>';
-    else html += ' <span style="color:var(--text-muted);font-size:12px;">　商品 ' + itemCount + ' 件' + (giftCount > 0 ? '、贈品 ' + giftCount + ' 件' : '') + '</span>';
+    else {
+      var summaryParts = ['商品 ' + itemCount + ' 件'];
+      if (giftCount > 0) summaryParts.push('贈品 ' + giftCount + ' 件');
+      if (returnCount > 0) summaryParts.push('<span style="color:#c00;">退貨 ' + returnCount + ' 件</span>');
+      html += ' <span style="color:var(--text-muted);font-size:12px;">　' + summaryParts.join('、') + '</span>';
+    }
     html += '</summary>';
     if (!ob.error) {
       html += '<div style="margin-top:6px;font-size:13px;">';
@@ -683,6 +726,14 @@ function renderSummary(agg, giftAgg, orderBreakdown, productInfo) {
       ob.gifts.forEach(function(g) {
         html += '<div style="padding:2px 0;color:#c00;">🎁 ' + esc(g.name) + ' × ' + g.qty + '</div>';
       });
+      if (ob.returns && ob.returns.length > 0) {
+        if (ob.returnReason) {
+          html += '<div style="margin-top:4px;padding:2px 0;color:#c00;font-size:11px;">↩ 退貨原因：' + esc(ob.returnReason) + '</div>';
+        }
+        ob.returns.forEach(function(rt) {
+          html += '<div style="padding:2px 0;color:#c00;">⚠ 退貨：' + esc(rt.name) + ' × ' + rt.qty + '</div>';
+        });
+      }
       html += '</div>';
     }
     html += '</details>';
@@ -691,7 +742,12 @@ function renderSummary(agg, giftAgg, orderBreakdown, productInfo) {
   summaryEl.innerHTML = html;
 
   // 存起來以供列印用
-  window._lastSummary = { agg: agg, giftAgg: giftAgg, orderBreakdown: orderBreakdown, productInfo: productInfo, today: today, aggNames: aggNames, giftNames: giftNames };
+  window._lastSummary = {
+    agg: agg, giftAgg: giftAgg, returnAgg: returnAgg,
+    orderBreakdown: orderBreakdown, productInfo: productInfo,
+    today: today,
+    aggNames: aggNames, giftNames: giftNames, returnNames: returnNames
+  };
 }
 
 function printSummary() {
@@ -699,6 +755,7 @@ function printSummary() {
   if (!s) { alert('無資料可列印'); return; }
   var totalItems = s.aggNames.reduce(function(sum, n) { return sum + s.agg[n]; }, 0);
   var totalGifts = s.giftNames.reduce(function(sum, n) { return sum + s.giftAgg[n]; }, 0);
+  var totalReturns = (s.returnNames || []).reduce(function(sum, n) { return sum + s.returnAgg[n]; }, 0);
 
   var css = "@page { size: A4 portrait; margin: 12mm; }"
     + "* { box-sizing: border-box; margin: 0; padding: 0; }"
@@ -708,26 +765,37 @@ function printSummary() {
     + ".sub { font-size: 9pt; color: #666; margin-bottom: 4mm; }"
     + "h2 { font-size: 12pt; margin: 6mm 0 2mm; padding-bottom: 1mm; border-bottom: 1.5px solid #333; }"
     + "h2.gift { color: #c00; border-bottom-color: #c00; }"
+    + "h2.return { color: #c00; border-bottom: 2.5px solid #c00; background: #fff5f5; padding: 1mm 2mm; }"
     + "h2.page-break { page-break-before: always; margin-top: 0; }"
     + "table { width: 100%; border-collapse: collapse; font-size: 10pt; }"
     + "th, td { border: 1px solid #999; padding: 2mm 3mm; text-align: left; vertical-align: middle; }"
     + "th { background: #eee; font-weight: 600; }"
     + "td.qty { text-align: right; font-weight: 700; font-size: 11pt; width: 12%; }"
     + "td.qty.gift { color: #c00; }"
+    + "td.qty.return { color: #c00; }"
     + "td.loc { width: 14%; }"
     + "td.sku { width: 16%; color: #666; font-size: 9pt; }"
     + "td.img-cell { width: 18mm; text-align: center; padding: 1.5mm; }"
     + "td.img-cell img { width: 14mm; height: 14mm; object-fit: cover; border-radius: 2mm; display: block; margin: 0 auto; }"
     + "td.img-cell .no-img { width: 14mm; height: 14mm; background: #f5f5f5; border-radius: 2mm; display: flex; align-items: center; justify-content: center; font-size: 7pt; color: #aaa; margin: 0 auto; }"
     + "td.img-cell .no-img.gift { background: #fff0f0; color: #c00; }"
+    + "td.img-cell .no-img.return { background: #ffebee; color: #c00; }"
+    + "table.return-tbl tr td { background: #fff9f9; }"
+    + "table.return-tbl tr td.name-col { color: #c00; font-weight: 600; }"
     + ".order-block { margin-top: 4mm; padding: 2mm 3mm; border: 1px solid #ccc; border-radius: 2mm; page-break-inside: avoid; }"
+    + ".order-block.has-return { border-color: #ffcdd2; background: #fffafa; }"
     + ".order-title { font-weight: 600; font-size: 10pt; margin-bottom: 1mm; }"
     + ".order-items { font-size: 9pt; line-height: 1.6; }"
-    + ".order-items .gift { color: #c00; }";
+    + ".order-items .gift { color: #c00; }"
+    + ".order-items .return { color: #c00; font-weight: 600; }"
+    + ".order-items .return-reason { color: #c00; font-size: 8pt; padding: 1mm 0; }";
 
   var label = window._summaryDateLabel || '今日';
+  var subParts = [esc(s.today), s.orderBreakdown.length + ' 筆訂單', '商品 ' + totalItems + ' 件'];
+  if (totalGifts > 0) subParts.push('贈品 ' + totalGifts + ' 件');
+  if (totalReturns > 0) subParts.push('<span style="color:#c00;">退貨 ' + totalReturns + ' 件</span>');
   var body = '<h1>' + esc(label) + '出貨商品總清單</h1>'
-    + '<div class="sub">' + esc(s.today) + '　·　' + s.orderBreakdown.length + ' 筆訂單　·　商品 ' + totalItems + ' 件　·　贈品 ' + totalGifts + ' 件</div>';
+    + '<div class="sub">' + subParts.join('　·　') + '</div>';
 
   // 商品彙總表
   body += '<h2>商品彙總</h2>';
@@ -770,21 +838,52 @@ function printSummary() {
     body += '</table>';
   }
 
+  // [v3.3] 退貨彙總表
+  if (s.returnNames && s.returnNames.length > 0) {
+    body += '<h2 class="return">⚠ 退貨彙總</h2>';
+    body += '<table class="return-tbl"><tr><th style="width:18mm;">圖</th><th>商品名稱</th><th class="sku">SKU</th><th class="loc">📍 位置</th><th class="qty">數量</th></tr>';
+    s.returnNames.forEach(function(n) {
+      var p = s.productInfo[n] || {};
+      var imgCell = p.img
+        ? '<img src="' + p.img + '" alt="">'
+        : '<div class="no-img return">' + (p.isNew ? '退貨新' : '退貨') + '</div>';
+      body += '<tr>'
+        + '<td class="img-cell">' + imgCell + '</td>'
+        + '<td class="name-col">' + esc(n) + '</td>'
+        + '<td class="sku">' + esc(p.sku || '-') + '</td>'
+        + '<td class="loc">' + esc(p.loc || '-') + '</td>'
+        + '<td class="qty return">× ' + s.returnAgg[n] + '</td>'
+        + '</tr>';
+    });
+    body += '</table>';
+  }
+
   // 按訂單明細（換頁）
   body += '<h2 class="page-break">按訂單明細</h2>';
   s.orderBreakdown.forEach(function(ob) {
     var itemCount = ob.items.reduce(function(s,i){return s+i.qty;},0);
     var giftCount = ob.gifts.reduce(function(s,i){return s+i.qty;},0);
-    body += '<div class="order-block">';
+    var returnCount = (ob.returns || []).reduce(function(s,i){return s+i.qty;},0);
+    var hasReturn = returnCount > 0;
+    body += '<div class="order-block' + (hasReturn ? ' has-return' : '') + '">';
     body += '<div class="order-title">';
     if (ob.contact) body += '<span style="color:#1976d2;">👤 ' + esc(ob.contact) + '</span>　';
     body += esc(ob.title);
-    if (!ob.error) body += '　<span style="font-weight:normal;color:#666;font-size:9pt;">商品 ' + itemCount + (giftCount > 0 ? ' / 贈品 ' + giftCount : '') + '</span>';
+    if (!ob.error) {
+      var parts = ['商品 ' + itemCount];
+      if (giftCount > 0) parts.push('贈品 ' + giftCount);
+      if (returnCount > 0) parts.push('<span style="color:#c00;">退貨 ' + returnCount + '</span>');
+      body += '　<span style="font-weight:normal;color:#666;font-size:9pt;">' + parts.join(' / ') + '</span>';
+    }
     body += '</div>';
     if (!ob.error) {
       body += '<div class="order-items">';
       ob.items.forEach(function(it) { body += '<div>· ' + esc(it.name) + ' × ' + it.qty + '</div>'; });
       ob.gifts.forEach(function(g) { body += '<div class="gift">· 🎁 ' + esc(g.name) + ' × ' + g.qty + '</div>'; });
+      if (ob.returns && ob.returns.length > 0) {
+        if (ob.returnReason) body += '<div class="return-reason">↩ 退貨原因：' + esc(ob.returnReason) + '</div>';
+        ob.returns.forEach(function(rt) { body += '<div class="return">· ⚠ 退貨：' + esc(rt.name) + ' × ' + rt.qty + '</div>'; });
+      }
       body += '</div>';
     }
     body += '</div>';
@@ -901,21 +1000,35 @@ async function loadDetail(pageId) {
     var items = parsed2.items;
     var giftItems = parsed2.gifts;
     var noteLines = parsed2.notes;
+    var returnItems = parsed2.returns || [];
+    var returnReason = parsed2.returnReason || '';
     var paymentText = parsed2.payment;
     currentTask._gifts = giftItems;
     currentTask._notes = noteLines;
+    currentTask._returns = returnItems;
+    currentTask._returnReason = returnReason;
     currentTask._payment = paymentText;
-    var allItems = items.concat((parsed2.gifts || []).map(function(g){ return {name: g.name, qty: g.qty, isGift: true}; }));
+    var allItems = items
+      .concat((parsed2.gifts || []).map(function(g){ return {name: g.name, qty: g.qty, isGift: true}; }))
+      .concat(returnItems.map(function(r){ return {name: r.name, qty: r.qty, isReturn: true}; }));
     if (allItems.length > 0) {
       gasAPI({ action: "productAll", items: JSON.stringify(allItems) }).then(function(res) {
         if (res && res.results) {
           var itemCount = items.length;
+          var giftCount = (parsed2.gifts || []).length;
           var regularResults = res.results.slice(0, itemCount);
-          var giftResults = res.results.slice(itemCount);
+          var giftResults = res.results.slice(itemCount, itemCount + giftCount);
+          var returnResults = res.results.slice(itemCount + giftCount);
           if (currentTask._gifts) {
             currentTask._gifts = currentTask._gifts.map(function(g, i) {
               var gr = giftResults[i] || {};
               return { name: g.name, qty: g.qty, sku: gr.sku||'', loc: gr.loc||'', isNew: gr.isNew||false, img: gr.img||'' };
+            });
+          }
+          if (currentTask._returns) {
+            currentTask._returns = currentTask._returns.map(function(r, i) {
+              var rr = returnResults[i] || {};
+              return { name: r.name, qty: r.qty, sku: rr.sku||'', loc: rr.loc||'', isNew: rr.isNew||false, img: rr.img||'' };
             });
           }
           renderProductArea(regularResults);
@@ -957,41 +1070,78 @@ function cleanItemText(text) {
 
 // [v3.2] 新邏輯：
 //   - 切點從 V/v/已備好 改成 *數字 後面
-//   - 加「贈品模式」：遇到 `贈` 開頭的行就進入贈品模式，後續 *N 行都算贈品
-//   - 修掉 `贈：` 獨佔一行會 push 空贈品的 bug
-//   - 容許 `* 1`（星號後有空格）的寫法
-//   - [v3.2 修] payment 偵測擴充：到付/貨到付款/需收/需收款/尾款/免收款/$數字 都算 payment
+//   - 贈品模式：遇到 `贈` 開頭的行就進入贈品模式，後續 *N 行都算贈品
+//   - payment 偵測擴充：到付/貨到付款/需收/需收款/尾款/免收款/$數字
+//   - [v3.3] [退貨]/[補寄] 區塊：
+//       [退貨] → 進入退貨模式，後續 *N 行歸 returns（不算商品數，獨立顯示）
+//       [補寄] → 退出退貨模式，回到一般商品（合併到 items）
+//       「原因：」行 → 退貨原因（顯示在退貨區附註）
 function parseItemText(text) {
-  if (!text) return { items: [], gifts: [], notes: [], payment: "" };
+  if (!text) return { items: [], gifts: [], notes: [], returns: [], returnReason: "", payment: "" };
   var lines = text.split("\n");
-  var items = [], gifts = [], notes = [], payment = "";
+  var items = [], gifts = [], notes = [], returns = [], payment = "";
+  var returnReason = "";
   var inGiftMode = false;
+  var inReturnMode = false;
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     if (!line) continue;
+
+    // [退貨] / [補寄] 區塊標籤偵測（獨佔一行）
+    if (/^\[退貨\]/.test(line)) {
+      inReturnMode = true;
+      inGiftMode = false;
+      continue;
+    }
+    if (/^\[補寄\]/.test(line)) {
+      inReturnMode = false;
+      inGiftMode = false;
+      continue;
+    }
+    // 退貨原因
+    if (inReturnMode && /^原因[：:]/.test(line)) {
+      var r = line.replace(/^原因[：:]\s*/, '').trim();
+      if (r) returnReason = returnReason ? (returnReason + '；' + r) : r;
+      continue;
+    }
+
     // 有 *數字 → 切到 *數字結尾（並記錄這行本來就含 *N）
     var qtyMatch = line.match(/\*\s*\d+/);
     if (qtyMatch) {
       line = line.substring(0, qtyMatch.index + qtyMatch[0].length).trim();
     }
     if (!line) continue;
+
     // 款項偵測（僅限沒 *N 的行）：避免商品名稱含 $ 被誤判
     if (!qtyMatch && (/需收款|需收|免收款|貨到付款|到付|尾款/.test(line) || /\$\s*\d+/.test(line))) {
       payment = line;
       inGiftMode = false;
+      inReturnMode = false;
       continue;
     }
+
+    // 退貨模式：*N 行歸 returns，其他行當原因附註
+    if (inReturnMode) {
+      if (/\*\s*\d+/.test(line)) {
+        var rm = line.match(/^(.+?)\s*\*\s*(\d+)\s*$/);
+        if (rm) returns.push({ name: rm[1].trim(), qty: rm[2] });
+        else returns.push({ name: line, qty: "1" });
+      } else {
+        // 退貨區內非 *N 的行（不是「原因：」開頭的）→ 也歸入備註
+        notes.push(line);
+      }
+      continue;
+    }
+
     // 遇到「贈」開頭 → 進入贈品模式
     if (/^贈/.test(line)) {
       inGiftMode = true;
       var giftName = line.replace(/^贈[：:：]?\s*/, "").trim();
       if (giftName) {
-        // 同一行已有贈品商品
         var giftQtyMatch = giftName.match(/^(.+?)\s*\*\s*(\d+)\s*$/);
         if (giftQtyMatch) gifts.push({ name: giftQtyMatch[1].trim(), qty: giftQtyMatch[2] });
         else gifts.push({ name: giftName, qty: "1" });
       }
-      // 若只是「贈：」獨佔一行 → 只進入模式、不 push
       continue;
     }
     // 贈品模式中：*N 行算贈品、其他行當備註
@@ -1005,7 +1155,7 @@ function parseItemText(text) {
       }
       continue;
     }
-    // 一般商品
+    // 一般商品（含 [補寄] 區內的、無標籤的）
     if (/\*\s*\d+/.test(line)) {
       var m = line.match(/^(.+?)\s*\*\s*(\d+)\s*$/);
       if (m) items.push({ name: m[1].trim(), qty: m[2] });
@@ -1014,7 +1164,7 @@ function parseItemText(text) {
     }
     notes.push(line);
   }
-  return { items: items, gifts: gifts, notes: notes, payment: payment };
+  return { items: items, gifts: gifts, notes: notes, returns: returns, returnReason: returnReason, payment: payment };
 }
 
 function renderDetail(detail) {
@@ -1762,6 +1912,30 @@ function renderProductArea(products) {
       });
       html += '</div></div>';
     }
+    // [v3.3] 退貨區（卡片版）
+    if (currentTask && currentTask._returns && currentTask._returns.length > 0) {
+      html += '<div style="margin-top:10px;padding-top:8px;border-top:3px solid #c00;background:#fff5f5;padding:10px;border-radius:6px;">';
+      html += '<div style="color:#c00;font-weight:700;font-size:15px;margin-bottom:4px;">⚠ 退貨：</div>';
+      if (currentTask._returnReason) {
+        html += '<div style="color:#c00;font-size:12px;margin-bottom:6px;">原因：' + esc(currentTask._returnReason) + '</div>';
+      }
+      html += '<div class="product-grid">';
+      currentTask._returns.forEach(function(r) {
+        html += '<div class="product-card" style="border-color:#ffcdd2;">';
+        if (r.isNew) {
+          html += '<div class="no-img" style="background:#ffebee;color:#c00;font-size:10px;">退貨新</div>';
+          html += '<div class="p-body"><div class="p-name">' + esc(r.name) + '</div>';
+          html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(r.qty) + '</div></div>';
+        } else {
+          if (r.img) html += '<img src="' + r.img + '" alt="">';
+          else html += '<div class="no-img" style="background:#ffebee;color:#c00;font-size:10px;">退貨</div>';
+          html += '<div class="p-body"><div class="p-name">' + esc(r.name) + '</div>';
+          html += '<div class="p-meta">SKU：' + esc(r.sku || '-') + '<br>📍 ' + esc(r.loc || '-') + '<br>數量：' + esc(r.qty) + '</div></div>';
+        }
+        html += '</div>';
+      });
+      html += '</div></div>';
+    }
     if (currentTask && currentTask._notes && currentTask._notes.length > 0) {
       html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-size:13px;color:var(--text-muted);">';
       html += '<span style="font-weight:600;">備註：</span>' + currentTask._notes.map(function(n){return esc(n);}).join('　');
@@ -1800,6 +1974,30 @@ function renderProductArea(products) {
           html += '<div class="p-info">';
           html += '<div class="p-name">' + esc(g.name) + '</div>';
           html += '<div class="p-meta">SKU：' + esc(g.sku || '-') + '　📍 ' + esc(g.loc || '-') + '　數量：' + esc(g.qty) + '</div>';
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    // [v3.3] 退貨區（列表版）
+    if (currentTask && currentTask._returns && currentTask._returns.length > 0) {
+      html += '<div style="margin-top:10px;padding:10px;border:2px solid #c00;background:#fff5f5;border-radius:6px;">';
+      html += '<div style="color:#c00;font-weight:700;font-size:15px;margin-bottom:4px;">⚠ 退貨：</div>';
+      if (currentTask._returnReason) {
+        html += '<div style="color:#c00;font-size:12px;margin-bottom:6px;">原因：' + esc(currentTask._returnReason) + '</div>';
+      }
+      currentTask._returns.forEach(function(r) {
+        html += '<div class="product-list-item">';
+        if (r.isNew) {
+          html += '<div class="no-img" style="background:#ffebee;color:#c00;font-size:10px;">退貨新</div>';
+          html += '<div class="p-info"><div class="p-name">' + esc(r.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(r.qty) + '</div></div>';
+        } else {
+          if (r.img) html += '<img src="' + r.img + '" alt="">';
+          else html += '<div class="no-img" style="background:#ffebee;color:#c00;font-size:10px;">退貨</div>';
+          html += '<div class="p-info">';
+          html += '<div class="p-name">' + esc(r.name) + '</div>';
+          html += '<div class="p-meta">SKU：' + esc(r.sku || '-') + '　📍 ' + esc(r.loc || '-') + '　數量：' + esc(r.qty) + '</div>';
           html += '</div>';
         }
         html += '</div>';
@@ -1930,7 +2128,10 @@ function doPrint() {
   var dateLabel = currentTask.date ? currentTask.date + (currentTask.isPickup ? "　（自取）" : "") : (currentTask.isPickup ? "（自取）" : "");
   var fieldTitle = document.getElementById("field-title") ? document.getElementById("field-title").value : currentTask.title;
   var itemTextVal = document.getElementById('item-text') ? document.getElementById('item-text').value : currentTask.itemText;
+  // [v3.3] 商品數不含退貨：用 textarea 全部 *N 總和，扣掉退貨總和
   var totalCount = countItems(itemTextVal);
+  var returnTotalQty = (currentTask._returns || []).reduce(function(s, r) { return s + (parseInt(r.qty) || 0); }, 0);
+  totalCount = Math.max(0, totalCount - returnTotalQty);
   var staffChecked = [];
   var staffBoxes = document.querySelectorAll('#staff-select input:checked');
   staffBoxes.forEach(function(b){ staffChecked.push(b.value); });
@@ -2112,6 +2313,29 @@ function doPrint() {
           else html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#fff0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>贈品</div>";
           html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;'>" + esc(g.name) + "</div>";
           html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(g.sku || '-') + "　📍 " + esc(g.loc || '-') + "　數量：" + esc(g.qty) + "</div></div></div>";
+        }
+      });
+      html += "</div>";
+    }
+    // [v3.3] 退貨區（列印頁）
+    if (currentTask._returns && currentTask._returns.length > 0) {
+      html += "<div style='margin-top:8px;padding:8px;border:2px solid #c00;background:#fff5f5;border-radius:4px;'>";
+      html += "<div style='color:#c00;font-weight:700;font-size:" + Math.round(cardFontMd*1.3) + "pt;margin-bottom:2px;'>⚠ 退貨：</div>";
+      if (currentTask._returnReason) {
+        html += "<div style='color:#c00;font-size:" + cardFontSm + "pt;margin-bottom:4px;'>原因：" + esc(currentTask._returnReason) + "</div>";
+      }
+      currentTask._returns.forEach(function(r) {
+        html += "<div style='display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px dashed #ffcdd2;'>";
+        if (r.isNew) {
+          html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#ffebee;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>退貨新</div>";
+          html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;color:#c00;'>" + esc(r.name) + "</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(r.qty) + "</div></div></div>";
+        } else {
+          if (r.img) html += "<img src='" + r.img + "' style='width:" + listImgSize + "px;height:" + listImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
+          else html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#ffebee;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>退貨</div>";
+          html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;color:#c00;'>" + esc(r.name) + "</div>";
+          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(r.sku || '-') + "　📍 " + esc(r.loc || '-') + "　數量：" + esc(r.qty) + "</div></div></div>";
         }
       });
       html += "</div>";

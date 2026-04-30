@@ -2317,27 +2317,49 @@ function doPrint() {
       });
       html += "</div>";
     }
-    // [v3.3] 退貨區（列印頁）
+    // [v3.3] 退貨區（列印頁，依 view 切換 card / list）
     if (currentTask._returns && currentTask._returns.length > 0) {
       html += "<div style='margin-top:8px;padding:8px;border:2px solid #c00;background:#fff5f5;border-radius:4px;'>";
       html += "<div style='color:#c00;font-weight:700;font-size:" + Math.round(cardFontMd*1.3) + "pt;margin-bottom:2px;'>⚠ 退貨：</div>";
       if (currentTask._returnReason) {
         html += "<div style='color:#c00;font-size:" + cardFontSm + "pt;margin-bottom:4px;'>原因：" + esc(currentTask._returnReason) + "</div>";
       }
-      currentTask._returns.forEach(function(r) {
-        html += "<div style='display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px dashed #ffcdd2;'>";
-        if (r.isNew) {
-          html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#ffebee;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>退貨新</div>";
-          html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;color:#c00;'>" + esc(r.name) + "</div>";
-          html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
-          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(r.qty) + "</div></div></div>";
-        } else {
-          if (r.img) html += "<img src='" + r.img + "' style='width:" + listImgSize + "px;height:" + listImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
-          else html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#ffebee;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>退貨</div>";
-          html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;color:#c00;'>" + esc(r.name) + "</div>";
-          html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(r.sku || '-') + "　📍 " + esc(r.loc || '-') + "　數量：" + esc(r.qty) + "</div></div></div>";
-        }
-      });
+      if (view === "card") {
+        // 卡片版
+        html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;'>";
+        currentTask._returns.forEach(function(r) {
+          html += "<div style='border:1px solid #ffcdd2;border-radius:6px;padding:8px;display:flex;gap:8px;align-items:flex-start;background:#fff;'>";
+          if (r.img) html += "<img src='" + r.img + "' style='width:" + cardImgSize + "px;height:" + cardImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
+          else html += "<div style='width:" + cardImgSize + "px;height:" + cardImgSize + "px;background:#ffebee;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>" + (r.isNew ? "退貨新" : "退貨") + "</div>";
+          html += "<div style='flex:1;'>";
+          html += "<div style='font-size:" + cardFontMd + "pt;font-weight:600;color:#c00;margin-bottom:3px;'>" + esc(r.name) + "</div>";
+          if (r.isNew) {
+            html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
+            html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(r.qty) + "</div>";
+          } else {
+            html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(r.sku || '-') + "</div>";
+            html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>📍 " + esc(r.loc || '-') + "　數量：" + esc(r.qty) + "</div>";
+          }
+          html += "</div></div>";
+        });
+        html += "</div>";
+      } else {
+        // 列表版（原本邏輯）
+        currentTask._returns.forEach(function(r) {
+          html += "<div style='display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px dashed #ffcdd2;'>";
+          if (r.isNew) {
+            html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#ffebee;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>退貨新</div>";
+            html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;color:#c00;'>" + esc(r.name) + "</div>";
+            html += "<div style='font-size:" + cardFontSm + "pt;color:#c00;'>新商品，無資料</div>";
+            html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>數量：" + esc(r.qty) + "</div></div></div>";
+          } else {
+            if (r.img) html += "<img src='" + r.img + "' style='width:" + listImgSize + "px;height:" + listImgSize + "px;object-fit:cover;border-radius:4px;flex-shrink:0;'>";
+            else html += "<div style='width:" + listImgSize + "px;height:" + listImgSize + "px;background:#ffebee;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:" + cardFontSm + "pt;color:#c00;'>退貨</div>";
+            html += "<div><div style='font-size:" + cardFontMd + "pt;font-weight:600;color:#c00;'>" + esc(r.name) + "</div>";
+            html += "<div style='font-size:" + cardFontSm + "pt;color:#666;'>SKU：" + esc(r.sku || '-') + "　📍 " + esc(r.loc || '-') + "　數量：" + esc(r.qty) + "</div></div></div>";
+          }
+        });
+      }
       html += "</div>";
     }
     // 備註已移到 info-table，此處不再重複

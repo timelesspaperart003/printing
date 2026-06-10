@@ -237,12 +237,18 @@ function showApp() {
   document.getElementById('login-gate').style.display = 'none';
   document.getElementById('app-main').style.display = 'block';
   preloadShippingData();
-  // Path B：網址帶 ?custId=...&name=... → 登入後直接載入該客戶未出貨出貨單
+  // Path B：網址帶 ?ids=id1,id2...&name=... → 登入後直接載入這些任務（bot 已查好的 page id）
+  //          或舊式 ?custId=...&name=... → 後端 byCustomer 查（保留向後相容）
   try {
     var _p = new URLSearchParams(location.search);
+    var _ids = _p.get('ids');
     var _cid = _p.get('custId');
     var _nm = _p.get('name') || '';
-    if (_cid) loadByCustomer(_cid, _nm);
+    if (_ids) {
+      loadByIds(_ids.split(',').map(function(s){ return s.trim(); }).filter(Boolean), _nm);
+    } else if (_cid) {
+      loadByCustomer(_cid, _nm);
+    }
   } catch(e) {}
 }
 
@@ -358,6 +364,41 @@ async function loadByCustomer(custId, name) {
       listEl.appendChild(div);
     });
     if (results.length === 1) { loadDetail(results[0].id); }  // 只有一筆 → 直接開好可印
+  } catch(e) {
+    statusEl.textContent = "載入失敗：" + e.message;
+    statusEl.className = "status error";
+  }
+}
+
+// Path B 主用：bot 直接帶任務 page id 清單進來，逐筆撈標題、顯示清單；單筆直接開好可印
+async function loadByIds(ids, name) {
+  var statusEl = document.getElementById("search-status");
+  var listEl = document.getElementById("tasks-list");
+  var inp = document.getElementById("search-input");
+  if (name && inp) inp.value = name;
+  if (!ids || !ids.length) { statusEl.textContent = "沒有指定任務"; return; }
+  statusEl.innerHTML = '<span class="spinner"></span>載入「' + (name || "") + '」出貨單（' + ids.length + '）...';
+  statusEl.className = "status";
+  listEl.innerHTML = "";
+  try {
+    // 並行撈每筆 detail 取標題/日期；失敗的略過
+    var settled = await Promise.all(ids.map(function(id) {
+      return gasAPI({ action: "detail", pageId: id })
+        .then(function(d) { return (d && !d.error) ? { id: id, title: d.title || "(無標題)", date: d.date || "" } : null; })
+        .catch(function() { return null; });
+    }));
+    var tasks = settled.filter(Boolean);
+    if (!tasks.length) { statusEl.textContent = "「" + (name || "此客戶") + "」查無可顯示的出貨單"; return; }
+    statusEl.textContent = "「" + (name || "") + "」出貨單（" + tasks.length + "）";
+    tasks.forEach(function(task) {
+      var div = document.createElement("div");
+      div.className = "task-item";
+      div.innerHTML = '<div class="task-item-title">' + esc(task.title) + '</div>'
+        + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
+      div.onclick = function() { loadDetail(task.id); };
+      listEl.appendChild(div);
+    });
+    if (tasks.length === 1) { loadDetail(tasks[0].id); }  // 只有一筆 → 直接開好可印
   } catch(e) {
     statusEl.textContent = "載入失敗：" + e.message;
     statusEl.className = "status error";

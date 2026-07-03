@@ -170,6 +170,11 @@
       </div>
       <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">完成期限為指定日期 · 標題含「出貨」</div>
     </div>
+    <div class="card" style="margin-top:0.75rem;">
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--text);">📦 SiteGiant 訂單</div>
+      <button class="primary" onclick="loadSiteGiant()">SiteGiant 待出貨清單</button>
+      <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">蝦皮等通路 · 待處理(Paid) · 每 10 分鐘自動同步</div>
+    </div>
     <div id="tasks-list"></div>
   </div>
   <div id="view-detail" style="display:none;">
@@ -184,11 +189,17 @@
       <div class="status"><span class="spinner"></span>彙整中...</div>
     </div>
   </div>
+  <div id="view-sitegiant" style="display:none;">
+    <button class="ghost" onclick="backFromSiteGiant()">← 返回搜尋</button>
+    <div class="card" id="sitegiant-content">
+      <div class="status"><span class="spinner"></span>載入中...</div>
+    </div>
+  </div>
 </div>
 
 <script>
 document.getElementById("today-date").textContent = new Date().toLocaleDateString("zh-TW",{year:"numeric",month:"2-digit",day:"2-digit"});
-var GAS_URL = "https://script.google.com/macros/s/AKfycbyRV0go7bFYTQkPwsSt7AQz1Lp2aEbaR2UXeaUgm_D0sMI9EwjFDYNzkzBvcGOwFpMBMA/exec";
+var GAS_URL = "https://script.google.com/macros/s/AKfycbx32ewy-B-1_dJ3NXlFgWI18U6cFFUJh5ILDNtmLDImuzWNg-rSJIYEcMmVTz4Yt8a-Jw/exec";
 
 // ========== 登入閘 ==========
 // 使用 sessionStorage 保持登入狀態，關閉分頁就失效
@@ -237,19 +248,6 @@ function showApp() {
   document.getElementById('login-gate').style.display = 'none';
   document.getElementById('app-main').style.display = 'block';
   preloadShippingData();
-  // Path B：網址帶 ?ids=id1,id2...&name=... → 登入後直接載入這些任務（bot 已查好的 page id）
-  //          或舊式 ?custId=...&name=... → 後端 byCustomer 查（保留向後相容）
-  try {
-    var _p = new URLSearchParams(location.search);
-    var _ids = _p.get('ids');
-    var _cid = _p.get('custId');
-    var _nm = _p.get('name') || '';
-    if (_ids) {
-      loadByIds(_ids.split(',').map(function(s){ return s.trim(); }).filter(Boolean), _nm);
-    } else if (_cid) {
-      loadByCustomer(_cid, _nm);
-    }
-  } catch(e) {}
 }
 
 function showLogin() {
@@ -338,69 +336,6 @@ async function searchTasks() {
     });
   } catch(e) {
     statusEl.textContent = "搜尋失敗：" + e.message;
-    statusEl.className = "status error";
-  }
-}
-
-async function loadByCustomer(custId, name) {
-  var statusEl = document.getElementById("search-status");
-  var listEl = document.getElementById("tasks-list");
-  var inp = document.getElementById("search-input");
-  if (name && inp) inp.value = name;
-  statusEl.innerHTML = '<span class="spinner"></span>載入「' + (name || "") + '」未出貨出貨單...';
-  statusEl.className = "status";
-  listEl.innerHTML = "";
-  try {
-    var results = await gasAPI({ action: "byCustomer", custId: custId });
-    if (results.error) throw new Error(results.error);
-    if (!results.length) { statusEl.textContent = "「" + (name || "此客戶") + "」目前沒有未出貨的出貨單"; return; }
-    statusEl.textContent = "「" + (name || "") + "」未出貨出貨單（" + results.length + "）";
-    results.forEach(function(task) {
-      var div = document.createElement("div");
-      div.className = "task-item";
-      div.innerHTML = '<div class="task-item-title">' + esc(task.title) + '</div>'
-        + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
-      div.onclick = function() { loadDetail(task.id); };
-      listEl.appendChild(div);
-    });
-    if (results.length === 1) { loadDetail(results[0].id); }  // 只有一筆 → 直接開好可印
-  } catch(e) {
-    statusEl.textContent = "載入失敗：" + e.message;
-    statusEl.className = "status error";
-  }
-}
-
-// Path B 主用：bot 直接帶任務 page id 清單進來，逐筆撈標題、顯示清單；單筆直接開好可印
-async function loadByIds(ids, name) {
-  var statusEl = document.getElementById("search-status");
-  var listEl = document.getElementById("tasks-list");
-  var inp = document.getElementById("search-input");
-  if (name && inp) inp.value = name;
-  if (!ids || !ids.length) { statusEl.textContent = "沒有指定任務"; return; }
-  statusEl.innerHTML = '<span class="spinner"></span>載入「' + (name || "") + '」出貨單（' + ids.length + '）...';
-  statusEl.className = "status";
-  listEl.innerHTML = "";
-  try {
-    // 並行撈每筆 detail 取標題/日期；失敗的略過
-    var settled = await Promise.all(ids.map(function(id) {
-      return gasAPI({ action: "detail", pageId: id })
-        .then(function(d) { return (d && !d.error) ? { id: id, title: d.title || "(無標題)", date: d.date || "" } : null; })
-        .catch(function() { return null; });
-    }));
-    var tasks = settled.filter(Boolean);
-    if (!tasks.length) { statusEl.textContent = "「" + (name || "此客戶") + "」查無可顯示的出貨單"; return; }
-    statusEl.textContent = "「" + (name || "") + "」出貨單（" + tasks.length + "）";
-    tasks.forEach(function(task) {
-      var div = document.createElement("div");
-      div.className = "task-item";
-      div.innerHTML = '<div class="task-item-title">' + esc(task.title) + '</div>'
-        + '<div class="task-item-date">' + (task.date ? "完成期限：" + task.date : "未設定日期") + '</div>';
-      div.onclick = function() { loadDetail(task.id); };
-      listEl.appendChild(div);
-    });
-    if (tasks.length === 1) { loadDetail(tasks[0].id); }  // 只有一筆 → 直接開好可印
-  } catch(e) {
-    statusEl.textContent = "載入失敗：" + e.message;
     statusEl.className = "status error";
   }
 }
@@ -2700,6 +2635,197 @@ document.getElementById("search-input").addEventListener("keydown", function(e) 
     if (e.key === 'Enter') loadShippingByDate();
   });
 })();
+// ==================================================================
+// ========= SiteGiant 待出貨（Stage 2，獨立區塊，不動既有功能）=========
+// ==================================================================
+var siteGiantOrders = [];
+
+function sgEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function loadSiteGiant() {
+  document.getElementById("view-search").style.display = "none";
+  document.getElementById("view-sitegiant").style.display = "block";
+  var el = document.getElementById("sitegiant-content");
+  el.innerHTML = '<div class="status"><span class="spinner"></span>載入中...</div>';
+  try {
+    var data = await gasAPI({ action: "siteGiantList" });
+    if (data.error) throw new Error(data.error);
+    siteGiantOrders = data.orders || [];
+    renderSiteGiantList();
+  } catch (e) {
+    el.innerHTML = '<div class="status error">載入失敗：' + sgEsc(e.message) + '</div>'
+      + '<button onclick="loadSiteGiant()" style="margin-top:10px;width:100%;">🔄 再試一次</button>';
+  }
+}
+
+function backFromSiteGiant() {
+  document.getElementById("view-sitegiant").style.display = "none";
+  document.getElementById("view-search").style.display = "block";
+}
+
+function sgFilter() {
+  var box = document.getElementById('sg-search');
+  var kw = (box ? box.value : '').trim().toLowerCase();
+  var cards = document.querySelectorAll('#sg-list .sg-card');
+  cards.forEach(function(c) {
+    var hay = c.getAttribute('data-hay') || '';
+    c.style.display = (!kw || hay.indexOf(kw) >= 0) ? 'block' : 'none';
+  });
+}
+
+function renderSiteGiantList() {
+  var el = document.getElementById("sitegiant-content");
+  if (!siteGiantOrders.length) {
+    el.innerHTML = '<div style="font-weight:600;margin-bottom:6px;">SiteGiant 待出貨</div>'
+      + '<div class="status">目前沒有待出貨訂單</div>'
+      + '<button onclick="loadSiteGiant()" style="margin-top:10px;width:100%;">🔄 重新整理</button>';
+    return;
+  }
+  var html = '';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+  html += '<div style="font-weight:600;">SiteGiant 待出貨 · ' + siteGiantOrders.length + ' 筆</div>';
+  html += '<button onclick="loadSiteGiant()" style="padding:6px 12px;font-size:13px;">🔄 重新整理</button>';
+  html += '</div>';
+  html += '<input type="text" id="sg-search" oninput="sgFilter()" placeholder="搜尋 單號 / 收件人 / 商品..." style="margin-bottom:10px;" />';
+  html += '<button onclick="printAllSiteGiantPick()" style="width:100%;margin-bottom:12px;background:#1e7e34;color:#fff;border-color:#1e7e34;">🖨️ 全部撿貨清單（一次列印）</button>';
+  html += '<div id="sg-list">';
+  siteGiantOrders.forEach(function(o, i) {
+    var hay = ((o.marketplace_order_id || '') + ' ' + (o.order_id || '') + ' ' + (o.recipient_name || '') + ' ' + (o.items_summary || '')).toLowerCase();
+    html += '<div class="sg-card" data-hay="' + sgEsc(hay) + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
+    html += '<div style="display:flex;justify-content:space-between;gap:8px;">';
+    html += '<div style="font-weight:600;font-size:14px;">' + sgEsc(o.recipient_name || '(無收件人)') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text-muted);white-space:nowrap;">' + sgEsc(o.channel_name || '') + '</div>';
+    html += '</div>';
+    html += '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '　·　' + sgEsc((o.order_time || '').substring(0, 16)) + '</div>';
+    if (o.ship_by_date) html += '<div style="font-size:12px;color:var(--danger);margin-top:2px;">出貨期限 ' + sgEsc(o.ship_by_date) + '</div>';
+    html += '<div style="font-size:13px;margin-top:6px;line-height:1.5;">' + sgEsc(o.items_summary || '') + '</div>';
+    html += '<div style="display:flex;gap:8px;margin-top:10px;">';
+    html += '<button onclick="printSiteGiantPick(' + i + ')" style="flex:1;padding:9px;font-size:14px;">📋 撿貨清單</button>';
+    html += '<button onclick="printSiteGiantLabel(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🏷️ 運送單</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function sgItemsRows(o) {
+  var rows = '';
+  (o.items || []).forEach(function(it) {
+    rows += '<tr>';
+    rows += '<td class="nm">' + sgEsc(it.name || '') + (it.variation ? '<div class="vr">' + sgEsc(it.variation) + '</div>' : '') + '</td>';
+    rows += '<td class="sku">' + sgEsc(it.sku || '') + '</td>';
+    rows += '<td class="loc">' + sgEsc(it.loc || '') + '</td>';
+    rows += '<td class="qty">' + sgEsc(String(it.qty || '')) + '</td>';
+    rows += '</tr>';
+  });
+  return rows;
+}
+
+// 撿貨清單（A）
+function sgPickHtml(o) {
+  var h = '<div class="doc">';
+  h += '<div class="hd"><div class="t">撿貨清單</div><div class="meta">' + sgEsc(o.channel_name || '') + '　單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '</div></div>';
+  h += '<div class="sub">收件人：' + sgEsc(o.recipient_name || '') + '　|　出貨期限：' + sgEsc(o.ship_by_date || '-') + '</div>';
+  h += '<table class="it"><thead><tr><th>商品名稱</th><th class="sku">SKU</th><th class="loc">📍儲位</th><th class="qty">數量</th></tr></thead><tbody>';
+  h += sgItemsRows(o);
+  h += '</tbody></table></div>';
+  return h;
+}
+
+function printSiteGiantPick(i) {
+  var o = siteGiantOrders[i];
+  if (o) sgOpenPrint('撿貨清單', sgPickCss(), sgPickHtml(o));
+}
+
+function printAllSiteGiantPick() {
+  if (!siteGiantOrders.length) return;
+  var body = siteGiantOrders.map(function(o) { return sgPickHtml(o); }).join('<div class="pb"></div>');
+  sgOpenPrint('撿貨清單（全部）', sgPickCss(), body);
+}
+
+function sgPickCss() {
+  return [
+    "*{box-sizing:border-box;margin:0;padding:0;}",
+    "body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;color:#111;}",
+    "@page{size:A4 portrait;margin:12mm;}",
+    ".doc{margin-bottom:8mm;}",
+    ".pb{page-break-after:always;}",
+    ".hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #000;padding-bottom:4px;}",
+    ".hd .t{font-size:18pt;font-weight:700;}",
+    ".hd .meta{font-size:10pt;color:#333;}",
+    ".sub{font-size:11pt;margin:6px 0 10px;}",
+    "table.it{width:100%;border-collapse:collapse;}",
+    "table.it th,table.it td{border:1px solid #000;padding:6px 8px;font-size:12pt;text-align:left;vertical-align:top;}",
+    "table.it th{background:#f0f0f0;text-align:center;}",
+    "table.it td.sku{font-family:monospace;white-space:nowrap;}",
+    "table.it td.loc{font-weight:700;text-align:center;white-space:nowrap;}",
+    "table.it td.qty{font-size:15pt;font-weight:700;text-align:center;}",
+    ".vr{font-size:9pt;color:#666;margin-top:2px;}"
+  ].join("");
+}
+
+// A4 運送單（B）
+function sgLabelHtml(o) {
+  var h = '<div class="doc">';
+  h += '<div class="hd"><div class="t">出貨單</div><div class="ch">' + sgEsc(o.channel_name || '') + '</div></div>';
+  h += '<table class="rcpt">';
+  h += '<tr><td class="lb">收件人</td><td class="vl big">' + sgEsc(o.recipient_name || '') + '</td></tr>';
+  h += '<tr><td class="lb">電話</td><td class="vl">' + sgEsc(o.recipient_phone || '') + '</td></tr>';
+  h += '<tr><td class="lb">地址</td><td class="vl big">' + sgEsc(o.recipient_address || '') + '</td></tr>';
+  h += '</table>';
+  h += '<table class="info">';
+  h += '<tr><td class="lb">訂單編號</td><td>' + sgEsc(o.marketplace_order_id || o.order_id) + '</td><td class="lb">出貨期限</td><td>' + sgEsc(o.ship_by_date || '-') + '</td></tr>';
+  h += '<tr><td class="lb">物流</td><td>' + sgEsc(o.shipping_carrier || '') + '</td><td class="lb">追蹤碼</td><td>' + sgEsc(o.tracking_no || '') + '</td></tr>';
+  h += '<tr><td class="lb">付款</td><td>' + sgEsc(o.payment_method || '') + '</td><td class="lb">金額</td><td>' + sgEsc(o.total_amount ? ('$' + o.total_amount) : '') + '</td></tr>';
+  h += '</table>';
+  h += '<table class="it"><thead><tr><th>商品名稱</th><th class="sku">SKU</th><th class="loc">儲位</th><th class="qty">數量</th></tr></thead><tbody>';
+  h += sgItemsRows(o);
+  h += '</tbody></table></div>';
+  return h;
+}
+
+function printSiteGiantLabel(i) {
+  var o = siteGiantOrders[i];
+  if (o) sgOpenPrint('出貨單', sgLabelCss(), sgLabelHtml(o));
+}
+
+function sgLabelCss() {
+  return [
+    "*{box-sizing:border-box;margin:0;padding:0;}",
+    "body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;color:#111;}",
+    "@page{size:A4 portrait;margin:12mm;}",
+    ".doc{margin-bottom:8mm;}",
+    ".pb{page-break-after:always;}",
+    ".hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px;}",
+    ".hd .t{font-size:22pt;font-weight:700;letter-spacing:4px;}",
+    ".hd .ch{font-size:11pt;color:#333;}",
+    "table.rcpt{width:100%;border-collapse:collapse;margin-bottom:8px;}",
+    "table.rcpt td{padding:6px 8px;border-bottom:1px solid #ddd;vertical-align:top;}",
+    "table.rcpt td.lb{width:18%;color:#555;font-size:10pt;white-space:nowrap;}",
+    "table.rcpt td.vl{font-size:12pt;}",
+    "table.rcpt td.big{font-size:15pt;font-weight:600;}",
+    "table.info{width:100%;border-collapse:collapse;margin:8px 0 12px;}",
+    "table.info td{padding:5px 8px;border:1px solid #ccc;font-size:10.5pt;}",
+    "table.info td.lb{background:#f5f5f5;color:#555;white-space:nowrap;width:14%;}",
+    "table.it{width:100%;border-collapse:collapse;}",
+    "table.it th,table.it td{border:1px solid #000;padding:6px 8px;font-size:11pt;text-align:left;vertical-align:top;}",
+    "table.it th{background:#f0f0f0;text-align:center;}",
+    "table.it td.sku{font-family:monospace;white-space:nowrap;}",
+    "table.it td.loc{font-weight:700;text-align:center;white-space:nowrap;}",
+    "table.it td.qty{font-size:14pt;font-weight:700;text-align:center;}",
+    ".vr{font-size:9pt;color:#666;margin-top:2px;}"
+  ].join("");
+}
+
+function sgOpenPrint(title, css, body) {
+  var win = window.open("", "_blank", "width=800,height=700");
+  win.document.write("<!DOCTYPE html><html lang='zh-TW'><head><meta charset='UTF-8'><title>" + title + "</title><style>" + css + "</style></head><body>" + body + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");
+  win.document.close();
+}
 </script>
 </body>
 </html>

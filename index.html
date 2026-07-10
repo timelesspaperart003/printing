@@ -232,31 +232,47 @@
   }
   .review-edit-link:hover { color: var(--text); }
 
-  /* History log */
+  /* History log cards */
   .log-item {
-    padding: 10px 0; border-bottom: 1px solid var(--border);
-    font-size: 13px; line-height: 1.6;
+    padding: 12px 14px; margin-bottom: 8px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface-2); font-size: 13px;
   }
-  .log-item:last-child { border-bottom: none; }
+  .log-item:last-child { margin-bottom: 0; }
   .log-meta {
-    display: flex; gap: 8px; align-items: center;
-    margin-bottom: 4px; flex-wrap: wrap;
+    display: flex; gap: 6px; align-items: center;
+    margin-bottom: 8px; flex-wrap: wrap;
   }
   .log-user {
     background: var(--accent); color: #fff;
-    padding: 1px 8px; border-radius: 10px;
-    font-size: 11px; font-weight: 600;
+    padding: 2px 10px; border-radius: 10px;
+    font-size: 12px; font-weight: 600;
   }
-  .log-time { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+  .log-time { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-left: auto; }
   .log-scope {
-    font-size: 10px; font-weight: 600; padding: 1px 6px;
+    font-size: 10px; font-weight: 600; padding: 2px 8px;
+    border-radius: 3px;
+  }
+  .log-scope.all, .log-scope:not(.this) { color: var(--cut-label-text); background: var(--cut-cell-bg); border: 1px solid var(--cut-label-bg); }
+  .log-scope.this { color: var(--print-label-text); background: var(--print-cell-bg); border: 1px solid var(--print-label-bg); }
+  .log-key {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    background: var(--surface); padding: 2px 8px;
     border-radius: 3px; border: 1px solid var(--border);
   }
-  .log-scope.all { color: var(--cut-label-text); background: var(--cut-cell-bg); }
-  .log-scope.this { color: var(--print-label-text); background: var(--print-cell-bg); }
-  .log-key { font-size: 12px; font-weight: 600; color: var(--text); }
-  .log-change { font-size: 12px; color: var(--text-muted); }
-  .log-arrow { color: var(--text-dim); margin: 0 4px; }
+  .log-change-card {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px;
+    align-items: center;
+    background: var(--surface); border-radius: var(--radius-xs);
+    padding: 8px 10px; border: 1px solid var(--border);
+  }
+  .log-change-old, .log-change-new {
+    font-size: 11px; line-height: 1.5; color: var(--text-secondary);
+    word-break: break-all;
+  }
+  .log-change-old { opacity: .6; }
+  .log-change-new { font-weight: 500; color: var(--text); }
+  .log-arrow { color: var(--text-dim); font-size: 14px; text-align: center; flex-shrink: 0; }
   .log-empty { text-align: center; color: var(--text-muted); padding: 30px; }
 
   .schedule-wrapper { padding: 24px 32px 40px; }
@@ -1230,7 +1246,7 @@ function backToStep1() {
 }
 
 var ADMINS = [
-  { name: '老闆', hash: '2eef75362c5d08a31384dedf71617445c31969f405ad2d554da73ad6fc5fe327' },
+  { name: '管理員', hash: '2eef75362c5d08a31384dedf71617445c31969f405ad2d554da73ad6fc5fe327' },
   { name: '操作員A', hash: '6e110f529869586eaeb5839280b75ff1bbb90d7dc9c9410c2ad4c9bec1d9a866' },
   { name: '操作員B', hash: 'f2a5cec9c8580cea2119fe434ace37d925b629e636073d79bc22661a97382c28' }
 ];
@@ -1366,12 +1382,20 @@ function renderLogList() {
       var h = '';
       for (var i = 0; i < logs.length; i++) {
         var log = logs[i];
-        h += '<div class="log-item"><div class="log-meta">';
+        var scopeClass = (log.scope.indexOf('所有週') >= 0) ? 'all' : 'this';
+        h += '<div class="log-item">';
+        h += '<div class="log-meta">';
         h += '<span class="log-user">' + log.user + '</span>';
-        h += '<span class="log-scope">' + log.scope + '</span>';
+        h += '<span class="log-scope ' + scopeClass + '">' + log.scope + '</span>';
         h += '<span class="log-key">' + log.key + '</span>';
         h += '<span class="log-time">' + log.time + '</span>';
-        h += '</div><div class="log-change">' + log.oldData + '<span class="log-arrow">→</span>' + log.newData + '</div></div>';
+        h += '</div>';
+        h += '<div class="log-change-card">';
+        h += '<div class="log-change-old">' + log.oldData + '</div>';
+        h += '<div class="log-arrow">→</div>';
+        h += '<div class="log-change-new">' + log.newData + '</div>';
+        h += '</div>';
+        h += '</div>';
       }
       body.innerHTML = h;
     }).catch(function() { body.innerHTML = '<div class="log-empty">載入失敗</div>'; });

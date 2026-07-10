@@ -203,6 +203,35 @@
     line-height: 1; z-index: 2;
   }
 
+  /* Review modal */
+  .review-section { margin-bottom: 14px; }
+  .review-label { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  .review-compare {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px;
+    align-items: center; margin-bottom: 14px;
+  }
+  .review-box {
+    padding: 10px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); font-size: 12px; line-height: 1.6;
+  }
+  .review-box.current { background: var(--surface-2); }
+  .review-box.proposed { background: #fef9ee; border-color: #f59e0b; }
+  .review-box-title { font-size: 10px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
+  .review-arrow { font-size: 18px; color: var(--text-dim); text-align: center; }
+  .review-submitter { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+  .review-submitter strong { color: var(--text); }
+  .review-auth { margin-top: 12px; }
+  .review-pw-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .review-actions { display: flex; gap: 8px; }
+  .review-pw-error { font-size: 12px; color: var(--danger); margin-top: 4px; display: none; }
+  .review-edit-link {
+    display: block; text-align: center; margin-top: 12px;
+    font-size: 12px; color: var(--text-muted); cursor: pointer;
+    border: none; background: none; font-family: inherit;
+    text-decoration: underline;
+  }
+  .review-edit-link:hover { color: var(--text); }
+
   /* History log */
   .log-item {
     padding: 10px 0; border-bottom: 1px solid var(--border);
@@ -573,6 +602,12 @@
     <div class="modal-header"><h3 id="modalTitle">編輯班次</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveEdit()">儲存</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="reviewModal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-header"><h3 id="reviewTitle">待審核修改</h3><button class="modal-close" onclick="closeReview()">✕</button></div>
+    <div class="modal-body" id="reviewBody"></div>
   </div>
 </div>
 <div class="scope-overlay" id="saveScopeModal">
@@ -1006,21 +1041,143 @@ function applyFilter() {
 
 function openEdit(templateKey,timeLabel,day,dayIndex){
   editingCell=templateKey;
-  const dates=getWeekDates(currentWeekOffset);
-  const slotId=templateKey.split('-')[0];
-  const cell=getCellData(slotId,day,dates,dayIndex);
+  var dates=getWeekDates(currentWeekOffset);
+  var slotId=templateKey.split('-')[0];
+  var cell=getCellData(slotId,day,dates,dayIndex);
   editingDateKey=cell.dateKey;
-  const data=cell.data||{cut:[],print:[]};
-  document.getElementById('modalTitle').textContent=`編輯｜週${day}・${timeLabel}`;
-  let h=`<div class="form-section"><div class="form-section-title cut">${svgCut} 切割人員</div><div id="cutRows">`;
-  (data.cut||[]).forEach((p,i)=>{h+=pRow('cut',i,p.name,p.note);});
-  h+=`</div><button class="btn-add-person" onclick="addPerson('cut')">+ 新增切割人員</button></div>`;
-  h+=`<div class="form-section"><div class="form-section-title print">${svgPrint} 印+妙人員</div><div id="printRows">`;
-  (data.print||[]).forEach((p,i)=>{h+=pRow('print',i,p.name,p.note);});
-  h+=`</div><button class="btn-add-person" onclick="addPerson('print')">+ 新增印+妙人員</button></div>`;
+
+  // Check if this cell has pending changes
+  var cellPending = getPendingForCell(templateKey, cell.dateKey);
+  if (cellPending.length > 0) {
+    openReview(templateKey, timeLabel, day, dayIndex, cellPending, cell.data);
+    return;
+  }
+
+  // Normal edit
+  var data=cell.data||{cut:[],print:[]};
+  document.getElementById('modalTitle').textContent='編輯｜週'+day+'・'+timeLabel;
+  var h='<div class="form-section"><div class="form-section-title cut">'+svgCut+' 切割人員</div><div id="cutRows">';
+  (data.cut||[]).forEach(function(p,i){h+=pRow('cut',i,p.name,p.note);});
+  h+='</div><button class="btn-add-person" onclick="addPerson(\'cut\')">+ 新增切割人員</button></div>';
+  h+='<div class="form-section"><div class="form-section-title print">'+svgPrint+' 印+妙人員</div><div id="printRows">';
+  (data.print||[]).forEach(function(p,i){h+=pRow('print',i,p.name,p.note);});
+  h+='</div><button class="btn-add-person" onclick="addPerson(\'print\')">+ 新增印+妙人員</button></div>';
   document.getElementById('modalBody').innerHTML=h;
   document.getElementById('editModal').classList.add('active');
 }
+
+function getPendingForCell(templateKey, dateKey) {
+  var matches = [];
+  for (var i = 0; i < pendingData.length; i++) {
+    if (pendingData[i].templateKey === templateKey || pendingData[i].dateKey === dateKey) {
+      matches.push(pendingData[i]);
+    }
+  }
+  return matches;
+}
+
+function openReview(templateKey, timeLabel, day, dayIndex, cellPendings, currentData) {
+  document.getElementById('reviewTitle').textContent = '待審核｜週' + day + '・' + timeLabel;
+  var h = '';
+
+  for (var i = 0; i < cellPendings.length; i++) {
+    var p = cellPendings[i];
+    var oldStr = currentData ? formatCellPreview(currentData) : '（無排班）';
+    var newStr = p.data ? formatCellPreview(p.data) : '（清除）';
+
+    h += '<div class="review-section">';
+    h += '<div class="review-submitter">👤 <strong>' + p.user + '</strong> 提交了 <span class="log-scope ' + (p.scope === '所有週' ? 'all' : 'this') + '">' + p.scope + '</span> 修改</div>';
+
+    h += '<div class="review-compare">';
+    h += '<div class="review-box current"><div class="review-box-title">目前</div>' + formatCellDetail(currentData) + '</div>';
+    h += '<div class="review-arrow">→</div>';
+    h += '<div class="review-box proposed"><div class="review-box-title">修改為</div>' + formatCellDetail(p.data) + '</div>';
+    h += '</div>';
+
+    h += '<div class="review-auth">';
+    h += '<div class="review-label">輸入密碼審核</div>';
+    h += '<div class="review-pw-row">';
+    h += '<input type="password" class="scope-pw-input" id="reviewPw_' + i + '" placeholder="管理員/操作員密碼" onkeydown="if(event.key===\'Enter\')reviewAction(\'' + p.id + '\',' + i + ',\'approve\')">';
+    h += '</div>';
+    h += '<div class="review-actions">';
+    h += '<button class="btn-approve" onclick="reviewAction(\'' + p.id + '\',' + i + ',\'approve\')">✓ 批准</button>';
+    h += '<button class="btn-reject" onclick="reviewAction(\'' + p.id + '\',' + i + ',\'reject\')">✕ 拒絕</button>';
+    h += '</div>';
+    h += '<div class="review-pw-error" id="reviewErr_' + i + '">密碼錯誤或權限不足</div>';
+    h += '</div></div>';
+  }
+
+  h += '<button class="review-edit-link" onclick="closeReview();openEditDirect(\'' + templateKey + '\',\'' + timeLabel + '\',\'' + day + '\',' + dayIndex + ')">忽略待審核，直接編輯此格</button>';
+
+  document.getElementById('reviewBody').innerHTML = h;
+  document.getElementById('reviewModal').classList.add('active');
+}
+
+function formatCellDetail(data) {
+  if (!data) return '<span style="color:var(--text-dim)">（無排班）</span>';
+  var h = '';
+  if (data.cut && data.cut.length) {
+    h += '<div style="margin-bottom:3px"><span style="color:var(--cut-label-text);font-weight:600;font-size:11px">切割：</span>';
+    h += data.cut.map(function(p){ return '<span style="font-weight:600">' + p.name + '</span>' + (p.note ? '<span style="font-size:10px;opacity:.6"> ' + p.note + '</span>' : ''); }).join('、');
+    h += '</div>';
+  }
+  if (data.print && data.print.length) {
+    h += '<div><span style="color:var(--print-label-text);font-weight:600;font-size:11px">印+妙：</span>';
+    h += data.print.map(function(p){ return '<span style="font-weight:600">' + p.name + '</span>' + (p.note ? '<span style="font-size:10px;opacity:.6"> ' + p.note + '</span>' : ''); }).join('、');
+    h += '</div>';
+  }
+  return h || '<span style="color:var(--text-dim)">（空）</span>';
+}
+
+function reviewAction(pendingId, idx, action) {
+  var pwInput = document.getElementById('reviewPw_' + idx);
+  var errEl = document.getElementById('reviewErr_' + idx);
+  var pw = pwInput.value;
+  if (!pw) { errEl.style.display = 'block'; errEl.textContent = '請輸入密碼'; return; }
+
+  sha256(pw).then(function(hash) {
+    var approver = null;
+    for (var i = 0; i < ADMINS.length; i++) {
+      if (ADMINS[i].hash === hash) { approver = ADMINS[i].name; break; }
+    }
+    if (!approver) { errEl.style.display = 'block'; errEl.textContent = '密碼錯誤或權限不足'; pwInput.value = ''; return; }
+
+    errEl.style.display = 'none';
+    if (action === 'approve') {
+      showToast('批准中...');
+      apiPost({ action: 'approvePending', id: pendingId, approver: approver })
+        .then(function(resp) {
+          if (resp.success) { pendingData = pendingData.filter(function(p){ return p.id !== pendingId; }); closeReview(); loadData(); showToast(approver + ' 已批准'); }
+        }).catch(function() { showToast('操作失敗'); });
+    } else {
+      showToast('拒絕中...');
+      apiPost({ action: 'rejectPending', id: pendingId, approver: approver })
+        .then(function(resp) {
+          if (resp.success) { pendingData = pendingData.filter(function(p){ return p.id !== pendingId; }); closeReview(); renderAll(); showToast(approver + ' 已拒絕'); }
+        }).catch(function() { showToast('操作失敗'); });
+    }
+  });
+}
+
+function openEditDirect(templateKey, timeLabel, day, dayIndex) {
+  editingCell = templateKey;
+  var dates = getWeekDates(currentWeekOffset);
+  var slotId = templateKey.split('-')[0];
+  var cell = getCellData(slotId, day, dates, dayIndex);
+  editingDateKey = cell.dateKey;
+  var data = cell.data || {cut:[], print:[]};
+  document.getElementById('modalTitle').textContent = '編輯｜週' + day + '・' + timeLabel;
+  var h = '<div class="form-section"><div class="form-section-title cut">' + svgCut + ' 切割人員</div><div id="cutRows">';
+  (data.cut||[]).forEach(function(p,i){h+=pRow('cut',i,p.name,p.note);});
+  h += '</div><button class="btn-add-person" onclick="addPerson(\'cut\')">+ 新增切割人員</button></div>';
+  h += '<div class="form-section"><div class="form-section-title print">' + svgPrint + ' 印+妙人員</div><div id="printRows">';
+  (data.print||[]).forEach(function(p,i){h+=pRow('print',i,p.name,p.note);});
+  h += '</div><button class="btn-add-person" onclick="addPerson(\'print\')">+ 新增印+妙人員</button></div>';
+  document.getElementById('modalBody').innerHTML = h;
+  document.getElementById('editModal').classList.add('active');
+}
+
+function closeReview() { document.getElementById('reviewModal').classList.remove('active'); }
 
 function pRow(role,i,name,note){return `<div class="form-row" data-role="${role}"><input class="form-input" type="text" placeholder="姓名" value="${name||''}" data-field="name"><input class="form-input note-input" type="text" placeholder="備註（選填）" value="${note||''}" data-field="note"><button class="btn-remove" onclick="this.parentElement.remove()">✕</button></div>`;}
 function addPerson(role){const c=document.getElementById(role+'Rows');c.insertAdjacentHTML('beforeend',pRow(role,0,'',''));c.lastElementChild.querySelector('input').focus();}
@@ -1060,7 +1217,7 @@ function chooseSaveScope(scope) {
   var names = Object.keys(PERSON_COLORS);
   var btnsHtml = '';
   for (var i = 0; i < names.length; i++) {
-    btnsHtml += '<button class="scope-name-btn" onclick="confirmAsStaffName(\'' + names[i] + '\')">' + names[i] + '</button>';
+    btnsHtml += '<button class="scope-name-btn" onclick="confirmAsStaffName(\x27' + names[i] + '\x27)">' + names[i] + '</button>';
   }
   document.getElementById('staffNameBtns').innerHTML = btnsHtml;
   setTimeout(function(){ document.getElementById('scopePwInput').focus(); }, 50);
@@ -1167,8 +1324,8 @@ function renderPendingList() {
     h += '<span class="log-scope ' + (p.scope === '所有週' ? 'all' : 'this') + '">' + p.scope + '</span> ';
     h += '<span class="log-key">' + p.templateKey + '</span></div>';
     h += '<div class="pending-card-actions">';
-    h += '<button class="btn-approve" onclick="approvePending(\'' + p.id + '\')">✓ 批准</button>';
-    h += '<button class="btn-reject" onclick="rejectPending(\'' + p.id + '\')">✕ 拒絕</button>';
+    h += '<button class="btn-approve" onclick="approvePending(\x27' + p.id + '\x27)">✓ 批准</button>';
+    h += '<button class="btn-reject" onclick="rejectPending(\x27' + p.id + '\x27)">✕ 拒絕</button>';
     h += '</div></div>';
     h += '<div class="log-change">' + oldStr + '<span class="log-arrow">→</span>' + newStr + '</div></div>';
   }
@@ -1263,10 +1420,11 @@ function confirmSaveScope(scope, userName, isAdmin) {
 
 function closeModal(){document.getElementById('editModal').classList.remove('active');editingCell=null;}
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('reviewModal').addEventListener('click',function(e){if(e.target===this)closeReview();});
 document.getElementById('saveScopeModal').addEventListener('click',function(e){if(e.target===this){this.classList.remove('active');window._pendingSave=null;}});
 document.getElementById('historyModal').addEventListener('click',function(e){if(e.target===this)closeHistory();});
 document.getElementById('historyAuthModal').addEventListener('click',function(e){if(e.target===this){this.classList.remove('active');}});
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal();document.getElementById('saveScopeModal').classList.remove('active');closeHistory();document.getElementById('historyAuthModal').classList.remove('active');}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal();closeReview();document.getElementById('saveScopeModal').classList.remove('active');closeHistory();document.getElementById('historyAuthModal').classList.remove('active');}});
 
 function showToast(msg){const t=document.createElement('div');t.textContent=msg;Object.assign(t.style,{position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',background:'var(--text)',color:'#fff',padding:'10px 22px',borderRadius:'8px',fontSize:'13px',fontWeight:'500',boxShadow:'0 4px 16px rgba(0,0,0,.15)',zIndex:'9999',animation:'modalIn .2s ease',fontFamily:"'Noto Sans TC',sans-serif"});document.body.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3000);}
 

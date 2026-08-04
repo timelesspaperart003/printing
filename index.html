@@ -2712,10 +2712,16 @@ function renderSiteGiantList() {
   el.innerHTML = html;
 }
 
-function sgItemsRows(o) {
+function sgItemsRows(o, showImg) {
   var rows = '';
   (o.items || []).forEach(function(it) {
     rows += '<tr>';
+    if (showImg) {
+      var imgCell = it.img
+        ? '<img src="' + it.img + '" alt="" />'
+        : '<div class="noimg">📷<br>待補圖</div>';
+      rows += '<td class="ph">' + imgCell + '</td>';
+    }
     rows += '<td class="nm">' + sgEsc(it.name || '') + (it.variation ? '<div class="vr">' + sgEsc(it.variation) + '</div>' : '') + '</td>';
     rows += '<td class="sku">' + sgEsc(it.sku || '') + '</td>';
     rows += '<td class="loc">' + sgEsc(it.loc || '') + '</td>';
@@ -2730,8 +2736,8 @@ function sgPickHtml(o) {
   var h = '<div class="doc">';
   h += '<div class="hd"><div class="t">撿貨清單</div><div class="meta">' + sgEsc(o.channel_name || '') + '　單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '</div></div>';
   h += '<div class="sub">收件人：' + sgEsc(o.recipient_name || '') + '　|　出貨期限：' + sgEsc(o.ship_by_date || '-') + '</div>';
-  h += '<table class="it"><thead><tr><th>商品名稱</th><th class="sku">SKU</th><th class="loc">📍儲位</th><th class="qty">數量</th></tr></thead><tbody>';
-  h += sgItemsRows(o);
+  h += '<table class="it"><thead><tr><th class="ph">照片</th><th>商品名稱</th><th class="sku">SKU</th><th class="loc">📍儲位</th><th class="qty">數量</th></tr></thead><tbody>';
+  h += sgItemsRows(o, true);
   h += '</tbody></table></div>';
   return h;
 }
@@ -2764,6 +2770,9 @@ function sgPickCss() {
     "table.it td.sku{font-family:monospace;white-space:nowrap;}",
     "table.it td.loc{font-weight:700;text-align:center;white-space:nowrap;}",
     "table.it td.qty{font-size:15pt;font-weight:700;text-align:center;}",
+    "table.it th.ph,table.it td.ph{width:64px;text-align:center;padding:4px;}",
+    "table.it td.ph img{width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin:0 auto;}",
+    "table.it td.ph .noimg{width:56px;height:56px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:7.5pt;color:#999;border:1px dashed #ccc;border-radius:4px;margin:0 auto;line-height:1.3;text-align:center;}",
     ".vr{font-size:9pt;color:#666;margin-top:2px;}"
   ].join("");
 }

@@ -2669,11 +2669,28 @@ function backFromSiteGiant() {
 function sgFilter() {
   var box = document.getElementById('sg-search');
   var kw = (box ? box.value : '').trim().toLowerCase();
+  var chSel = document.getElementById('sg-filter-channel');
+  var scSel = document.getElementById('sg-filter-carrier');
+  var ch = chSel ? chSel.value : '';
+  var sc = scSel ? scSel.value : '';
   var cards = document.querySelectorAll('#sg-list .sg-card');
   cards.forEach(function(c) {
     var hay = c.getAttribute('data-hay') || '';
-    c.style.display = (!kw || hay.indexOf(kw) >= 0) ? 'block' : 'none';
+    var matchKw = !kw || hay.indexOf(kw) >= 0;
+    var matchCh = !ch || c.getAttribute('data-channel') === ch;
+    var matchSc = !sc || c.getAttribute('data-carrier') === sc;
+    c.style.display = (matchKw && matchCh && matchSc) ? 'block' : 'none';
   });
+}
+
+// 依當下實際訂單動態產生篩選選項，不寫死清單（通路/運送方式以後增加也不用改程式）
+function sgBuildFilterOptions(orders, field) {
+  var seen = {};
+  orders.forEach(function(o) {
+    var v = String(o[field] || '').trim();
+    if (v) seen[v] = true;
+  });
+  return Object.keys(seen).sort();
 }
 
 function renderSiteGiantList() {
@@ -2684,22 +2701,36 @@ function renderSiteGiantList() {
       + '<button onclick="loadSiteGiant()" style="margin-top:10px;width:100%;">🔄 重新整理</button>';
     return;
   }
+  var channels = sgBuildFilterOptions(siteGiantOrders, 'channel_name');
+  var carriers = sgBuildFilterOptions(siteGiantOrders, 'shipping_carrier');
+
   var html = '';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
   html += '<div style="font-weight:600;">SiteGiant 待出貨 · ' + siteGiantOrders.length + ' 筆</div>';
   html += '<button onclick="loadSiteGiant()" style="padding:6px 12px;font-size:13px;">🔄 重新整理</button>';
   html += '</div>';
-  html += '<input type="text" id="sg-search" oninput="sgFilter()" placeholder="搜尋 單號 / 收件人 / 商品..." style="margin-bottom:10px;" />';
+  html += '<input type="text" id="sg-search" oninput="sgFilter()" placeholder="搜尋 單號 / 收件人 / 商品..." style="margin-bottom:8px;" />';
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
+  html += '<select id="sg-filter-channel" onchange="sgFilter()" style="flex:1;">';
+  html += '<option value="">全部通路</option>';
+  channels.forEach(function(c) { html += '<option value="' + sgEsc(c) + '">' + sgEsc(c) + '</option>'; });
+  html += '</select>';
+  html += '<select id="sg-filter-carrier" onchange="sgFilter()" style="flex:1;">';
+  html += '<option value="">全部運送方式</option>';
+  carriers.forEach(function(c) { html += '<option value="' + sgEsc(c) + '">' + sgEsc(c) + '</option>'; });
+  html += '</select>';
+  html += '</div>';
   html += '<button onclick="printAllSiteGiantPick()" style="width:100%;margin-bottom:12px;background:#1e7e34;color:#fff;border-color:#1e7e34;">🖨️ 全部撿貨清單（一次列印）</button>';
   html += '<div id="sg-list">';
   siteGiantOrders.forEach(function(o, i) {
     var hay = ((o.marketplace_order_id || '') + ' ' + (o.order_id || '') + ' ' + (o.recipient_name || '') + ' ' + (o.items_summary || '')).toLowerCase();
-    html += '<div class="sg-card" data-hay="' + sgEsc(hay) + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
+    html += '<div class="sg-card" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
     html += '<div style="display:flex;justify-content:space-between;gap:8px;">';
     html += '<div style="font-weight:600;font-size:14px;">' + sgEsc(o.recipient_name || '(無收件人)') + '</div>';
     html += '<div style="font-size:12px;color:var(--text-muted);white-space:nowrap;">' + sgEsc(o.channel_name || '') + '</div>';
     html += '</div>';
     html += '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '　·　' + sgEsc((o.order_time || '').substring(0, 16)) + '</div>';
+    html += '<div style="font-size:12px;margin-top:4px;"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--surface-2,#eef);color:var(--accent,#333);font-weight:600;">🚚 ' + sgEsc(o.shipping_carrier || '未標示運送方式') + '</span></div>';
     if (o.ship_by_date) html += '<div style="font-size:12px;color:var(--danger);margin-top:2px;">出貨期限 ' + sgEsc(o.ship_by_date) + '</div>';
     html += '<div style="font-size:13px;margin-top:6px;line-height:1.5;">' + sgEsc(o.items_summary || '') + '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';

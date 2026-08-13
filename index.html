@@ -225,7 +225,7 @@ async function doLogin() {
   try {
     // 密碼驗證通過後，GS 會直接回傳 API_KEY
     var url = GAS_URL + "?action=verifyPassword&pwd=" + encodeURIComponent(pwd);
-    var res = await fetch(url);
+    var res = await fetch(url, { cache: "no-store" });
     var data = await res.json();
     if (data.ok && data.apiKey) {
       setApiKey(data.apiKey);
@@ -285,7 +285,7 @@ async function gasAPI(params) {
   var url = GAS_URL + "?" + Object.keys(withKey).map(function(k) {
     return encodeURIComponent(k) + "=" + encodeURIComponent(withKey[k]);
   }).join("&");
-  var res = await fetch(url);
+  var res = await fetch(url, { cache: "no-store" });
   var data = await res.json();
   // 若後端回 Unauthorized，代表 key 過期或被重設，清除並回登入
   if (data && data.error === 'Unauthorized') {

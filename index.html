@@ -2683,6 +2683,32 @@ function sgFilter() {
   });
 }
 
+// 儲存人工備註（存在後端獨立分頁，不受 SiteGiant 同步影響）
+async function sgSaveNote(i) {
+  var o = siteGiantOrders[i];
+  if (!o) return;
+  var ta = document.getElementById('sg-note-' + i);
+  var btn = document.getElementById('sg-note-btn-' + i);
+  var note = ta ? ta.value : '';
+  if (btn) { btn.disabled = true; btn.textContent = '儲存中...'; }
+  try {
+    var res = await gasAPI({ action: 'saveOrderNote', order_id: o.order_id, note: note });
+    if (res && res.ok) {
+      o.manual_note = note;
+      if (btn) {
+        btn.textContent = '✅ 已儲存';
+        setTimeout(function() { btn.textContent = '💾 存備註'; btn.disabled = false; }, 1500);
+      }
+    } else {
+      if (btn) { btn.textContent = '❌ 失敗'; btn.disabled = false; }
+      alert('儲存失敗：' + (res && res.error ? res.error : '未知錯誤'));
+    }
+  } catch (e) {
+    if (btn) { btn.textContent = '❌ 失敗'; btn.disabled = false; }
+    alert('儲存失敗：' + e.message);
+  }
+}
+
 // 依當下實際訂單動態產生篩選選項，不寫死清單（通路/運送方式以後增加也不用改程式）
 function sgBuildFilterOptions(orders, field) {
   var seen = {};
@@ -2732,6 +2758,7 @@ function renderSiteGiantList() {
     html += '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '　·　' + sgEsc((o.order_time || '').substring(0, 16)) + '</div>';
     html += '<div style="font-size:12px;margin-top:4px;"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--surface-2,#eef);color:var(--accent,#333);font-weight:600;">🚚 ' + sgEsc(o.shipping_carrier || '未標示運送方式') + '</span></div>';
     if (o.ship_by_date) html += '<div style="font-size:12px;color:var(--danger);margin-top:2px;">出貨期限 ' + sgEsc(o.ship_by_date) + '</div>';
+    if (o.customer_remark) html += '<div style="font-size:12px;background:#fff8e1;border-left:3px solid #f9a825;padding:6px 8px;border-radius:4px;margin-top:6px;">💬 客戶留言：' + sgEsc(o.customer_remark) + '</div>';
     html += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">';
     (o.items || []).forEach(function(it) {
       html += '<div style="display:flex;gap:10px;align-items:center;padding:6px;background:var(--bg,#f7f7f7);border-radius:8px;">';
@@ -2750,6 +2777,10 @@ function renderSiteGiantList() {
       html += '<div style="font-size:15px;font-weight:700;white-space:nowrap;">x' + sgEsc(String(it.qty || '')) + '</div>';
       html += '</div>';
     });
+    html += '</div>';
+    html += '<div style="display:flex;gap:6px;align-items:flex-start;margin-top:8px;">';
+    html += '<textarea id="sg-note-' + i + '" placeholder="輸入備註（例如出貨排程、特殊指示）..." style="flex:1;min-height:36px;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;resize:vertical;">' + sgEsc(o.manual_note || '') + '</textarea>';
+    html += '<button id="sg-note-btn-' + i + '" onclick="sgSaveNote(' + i + ')" style="padding:8px 10px;font-size:12px;white-space:nowrap;">💾 存備註</button>';
     html += '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantPick(' + i + ')" style="flex:1;padding:9px;font-size:14px;">📋 撿貨清單</button>';

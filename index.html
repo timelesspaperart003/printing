@@ -2771,6 +2771,17 @@ async function sgSaveNote(i) {
 async function sgCreateItemTask(orderIdx, itemIdx) {
   var o = siteGiantOrders[orderIdx];
   if (!o) return;
+  var manualShipDate = '';
+  if (!o.ship_by_date) {
+    var input = prompt('這張訂單沒有出貨期限，請輸入寄送日期（格式 YYYY-MM-DD）：');
+    if (!input) return; // 取消就不建立
+    input = input.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+      alert('日期格式不對，請用 YYYY-MM-DD，例如 2026-08-20');
+      return;
+    }
+    manualShipDate = input;
+  }
   var qtyEl = document.getElementById('sg-item-qty-' + orderIdx + '-' + itemIdx);
   var qty = qtyEl ? (parseInt(qtyEl.value, 10) || 1) : 1;
   var btn = document.getElementById('sg-item-task-btn-' + orderIdx + '-' + itemIdx);
@@ -2783,7 +2794,8 @@ async function sgCreateItemTask(orderIdx, itemIdx) {
       order_id: o.order_id,
       item_index: itemIdx,
       qty: qty,
-      role: getRole()
+      role: getRole(),
+      manual_ship_date: manualShipDate
     });
     console.log('createSiteGiantTask response', res);
     if (res && res.ok) {

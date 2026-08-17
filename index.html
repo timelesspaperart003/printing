@@ -2746,7 +2746,7 @@ function renderSiteGiantList() {
   carriers.forEach(function(c) { html += '<option value="' + sgEsc(c) + '">' + sgEsc(c) + '</option>'; });
   html += '</select>';
   html += '</div>';
-  html += '<button onclick="printAllSiteGiantPick()" style="width:100%;margin-bottom:12px;background:#1e7e34;color:#fff;border-color:#1e7e34;">🖨️ 全部撿貨清單（一次列印）</button>';
+  html += '<button onclick="printAllSiteGiantPick()" style="width:100%;margin-bottom:12px;background:#1e7e34;color:#fff;border-color:#1e7e34;">🖨️ 全部出貨單（一次列印）</button>';
   html += '<div id="sg-list">';
   siteGiantOrders.forEach(function(o, i) {
     var hay = ((o.marketplace_order_id || '') + ' ' + (o.order_id || '') + ' ' + (o.recipient_name || '') + ' ' + (o.items_summary || '')).toLowerCase();
@@ -2783,8 +2783,7 @@ function renderSiteGiantList() {
     html += '<button id="sg-note-btn-' + i + '" onclick="sgSaveNote(' + i + ')" style="padding:8px 10px;font-size:12px;white-space:nowrap;">💾 存備註</button>';
     html += '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
-    html += '<button onclick="printSiteGiantPick(' + i + ')" style="flex:1;padding:9px;font-size:14px;">📋 撿貨清單</button>';
-    html += '<button onclick="printSiteGiantLabel(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🏷️ 運送單</button>';
+    html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
     html += '</div>';
     html += '</div>';
   });
@@ -2811,39 +2810,54 @@ function sgItemsRows(o, showImg) {
   return rows;
 }
 
-// 撿貨清單（A）
-function sgPickHtml(o) {
+// 出貨單：撿貨清單＋運送單合併成一張（收件人/物流資訊 + 含照片的商品明細）
+function sgCombinedHtml(o) {
   var h = '<div class="doc">';
-  h += '<div class="hd"><div class="t">撿貨清單</div><div class="meta">' + sgEsc(o.channel_name || '') + '　單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '</div></div>';
-  h += '<div class="sub">收件人：' + sgEsc(o.recipient_name || '') + '　|　出貨期限：' + sgEsc(o.ship_by_date || '-') + '</div>';
+  h += '<div class="hd"><div class="t">出貨單</div><div class="meta">' + sgEsc(o.channel_name || '') + '　單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '</div></div>';
+  h += '<table class="rcpt">';
+  h += '<tr><td class="lb">收件人</td><td class="vl big">' + sgEsc(o.recipient_name || '') + '</td></tr>';
+  h += '<tr><td class="lb">電話</td><td class="vl">' + sgEsc(o.recipient_phone || '') + '</td></tr>';
+  h += '<tr><td class="lb">地址</td><td class="vl big">' + sgEsc(o.recipient_address || '') + '</td></tr>';
+  h += '</table>';
+  h += '<table class="info">';
+  h += '<tr><td class="lb">出貨期限</td><td>' + sgEsc(o.ship_by_date || '-') + '</td><td class="lb">物流</td><td>' + sgEsc(o.shipping_carrier || '') + '</td></tr>';
+  h += '<tr><td class="lb">追蹤碼</td><td>' + sgEsc(o.tracking_no || '') + '</td><td class="lb">付款</td><td>' + sgEsc(o.payment_method || '') + (o.total_amount ? ('　$' + sgEsc(o.total_amount)) : '') + '</td></tr>';
+  h += '</table>';
   h += '<table class="it"><thead><tr><th class="ph">照片</th><th>商品名稱</th><th class="sku">SKU</th><th class="loc">📍儲位</th><th class="qty">數量</th></tr></thead><tbody>';
   h += sgItemsRows(o, true);
   h += '</tbody></table></div>';
   return h;
 }
 
-function printSiteGiantPick(i) {
+function printSiteGiantOrder(i) {
   var o = siteGiantOrders[i];
-  if (o) sgOpenPrint('撿貨清單', sgPickCss(), sgPickHtml(o));
+  if (o) sgOpenPrint('出貨單', sgCombinedCss(), sgCombinedHtml(o));
 }
 
 function printAllSiteGiantPick() {
   if (!siteGiantOrders.length) return;
-  var body = siteGiantOrders.map(function(o) { return sgPickHtml(o); }).join('<div class="pb"></div>');
-  sgOpenPrint('撿貨清單（全部）', sgPickCss(), body);
+  var body = siteGiantOrders.map(function(o) { return sgCombinedHtml(o); }).join('<div class="pb"></div>');
+  sgOpenPrint('出貨單（全部）', sgCombinedCss(), body);
 }
 
-function sgPickCss() {
+function sgCombinedCss() {
   return [
     "*{box-sizing:border-box;margin:0;padding:0;}",
     "body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;color:#111;}",
     "@page{size:A4 portrait;margin:12mm;}",
     ".doc{margin-bottom:8mm;}",
     ".pb{page-break-after:always;}",
-    ".hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #000;padding-bottom:4px;}",
-    ".hd .t{font-size:18pt;font-weight:700;}",
-    ".hd .meta{font-size:10pt;color:#333;}",
-    ".sub{font-size:11pt;margin:6px 0 10px;}",
+    ".hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px;}",
+    ".hd .t{font-size:22pt;font-weight:700;letter-spacing:4px;}",
+    ".hd .meta{font-size:11pt;color:#333;}",
+    "table.rcpt{width:100%;border-collapse:collapse;margin-bottom:8px;}",
+    "table.rcpt td{padding:6px 8px;border-bottom:1px solid #ddd;vertical-align:top;}",
+    "table.rcpt td.lb{width:18%;color:#555;font-size:10pt;white-space:nowrap;}",
+    "table.rcpt td.vl{font-size:12pt;}",
+    "table.rcpt td.big{font-size:15pt;font-weight:600;}",
+    "table.info{width:100%;border-collapse:collapse;margin:8px 0 12px;}",
+    "table.info td{padding:5px 8px;border:1px solid #ccc;font-size:10.5pt;}",
+    "table.info td.lb{background:#f5f5f5;color:#555;white-space:nowrap;width:16%;}",
     "table.it{width:100%;border-collapse:collapse;}",
     "table.it th,table.it td{border:1px solid #000;padding:6px 8px;font-size:12pt;text-align:left;vertical-align:top;}",
     "table.it th{background:#f0f0f0;text-align:center;}",
@@ -2853,59 +2867,6 @@ function sgPickCss() {
     "table.it th.ph,table.it td.ph{width:64px;text-align:center;padding:4px;}",
     "table.it td.ph img{width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin:0 auto;}",
     "table.it td.ph .noimg{width:56px;height:56px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:7.5pt;color:#999;border:1px dashed #ccc;border-radius:4px;margin:0 auto;line-height:1.3;text-align:center;}",
-    ".vr{font-size:9pt;color:#666;margin-top:2px;}"
-  ].join("");
-}
-
-// A4 運送單（B）
-function sgLabelHtml(o) {
-  var h = '<div class="doc">';
-  h += '<div class="hd"><div class="t">出貨單</div><div class="ch">' + sgEsc(o.channel_name || '') + '</div></div>';
-  h += '<table class="rcpt">';
-  h += '<tr><td class="lb">收件人</td><td class="vl big">' + sgEsc(o.recipient_name || '') + '</td></tr>';
-  h += '<tr><td class="lb">電話</td><td class="vl">' + sgEsc(o.recipient_phone || '') + '</td></tr>';
-  h += '<tr><td class="lb">地址</td><td class="vl big">' + sgEsc(o.recipient_address || '') + '</td></tr>';
-  h += '</table>';
-  h += '<table class="info">';
-  h += '<tr><td class="lb">訂單編號</td><td>' + sgEsc(o.marketplace_order_id || o.order_id) + '</td><td class="lb">出貨期限</td><td>' + sgEsc(o.ship_by_date || '-') + '</td></tr>';
-  h += '<tr><td class="lb">物流</td><td>' + sgEsc(o.shipping_carrier || '') + '</td><td class="lb">追蹤碼</td><td>' + sgEsc(o.tracking_no || '') + '</td></tr>';
-  h += '<tr><td class="lb">付款</td><td>' + sgEsc(o.payment_method || '') + '</td><td class="lb">金額</td><td>' + sgEsc(o.total_amount ? ('$' + o.total_amount) : '') + '</td></tr>';
-  h += '</table>';
-  h += '<table class="it"><thead><tr><th>商品名稱</th><th class="sku">SKU</th><th class="loc">儲位</th><th class="qty">數量</th></tr></thead><tbody>';
-  h += sgItemsRows(o);
-  h += '</tbody></table></div>';
-  return h;
-}
-
-function printSiteGiantLabel(i) {
-  var o = siteGiantOrders[i];
-  if (o) sgOpenPrint('出貨單', sgLabelCss(), sgLabelHtml(o));
-}
-
-function sgLabelCss() {
-  return [
-    "*{box-sizing:border-box;margin:0;padding:0;}",
-    "body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;color:#111;}",
-    "@page{size:A4 portrait;margin:12mm;}",
-    ".doc{margin-bottom:8mm;}",
-    ".pb{page-break-after:always;}",
-    ".hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px;}",
-    ".hd .t{font-size:22pt;font-weight:700;letter-spacing:4px;}",
-    ".hd .ch{font-size:11pt;color:#333;}",
-    "table.rcpt{width:100%;border-collapse:collapse;margin-bottom:8px;}",
-    "table.rcpt td{padding:6px 8px;border-bottom:1px solid #ddd;vertical-align:top;}",
-    "table.rcpt td.lb{width:18%;color:#555;font-size:10pt;white-space:nowrap;}",
-    "table.rcpt td.vl{font-size:12pt;}",
-    "table.rcpt td.big{font-size:15pt;font-weight:600;}",
-    "table.info{width:100%;border-collapse:collapse;margin:8px 0 12px;}",
-    "table.info td{padding:5px 8px;border:1px solid #ccc;font-size:10.5pt;}",
-    "table.info td.lb{background:#f5f5f5;color:#555;white-space:nowrap;width:14%;}",
-    "table.it{width:100%;border-collapse:collapse;}",
-    "table.it th,table.it td{border:1px solid #000;padding:6px 8px;font-size:11pt;text-align:left;vertical-align:top;}",
-    "table.it th{background:#f0f0f0;text-align:center;}",
-    "table.it td.sku{font-family:monospace;white-space:nowrap;}",
-    "table.it td.loc{font-weight:700;text-align:center;white-space:nowrap;}",
-    "table.it td.qty{font-size:14pt;font-weight:700;text-align:center;}",
     ".vr{font-size:9pt;color:#666;margin-top:2px;}"
   ].join("");
 }

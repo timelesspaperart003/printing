@@ -2747,6 +2747,26 @@ async function sgSaveNote(i) {
   }
 }
 
+// 送給 n8n 建 Notion 製作任務（GAS 端組 payload 再 UrlFetchApp 打出去，避免瀏覽器直打 n8n 的 CORS 問題）
+async function sgCreateMakeTask(i) {
+  var o = siteGiantOrders[i];
+  if (!o) return;
+  var btn = document.getElementById('sg-task-btn-' + i);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 送出中...'; }
+  try {
+    var res = await gasAPI({ action: 'createSiteGiantTask', order_id: o.order_id });
+    if (res && res.ok) {
+      if (btn) { btn.textContent = '✅ 已送出'; }
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = '📝 創製作任務'; }
+      alert('建立任務失敗：' + (res && res.error ? res.error : '未知錯誤'));
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '📝 創製作任務'; }
+    alert('建立任務失敗：' + e.message);
+  }
+}
+
 // 依當下實際訂單動態產生篩選選項，不寫死清單（通路/運送方式以後增加也不用改程式）
 function sgBuildFilterOptions(orders, field) {
   var seen = {};
@@ -2835,6 +2855,7 @@ function renderSiteGiantList() {
     html += '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
+    html += '<button id="sg-task-btn-' + i + '" onclick="sgCreateMakeTask(' + i + ')" style="flex:1;padding:9px;font-size:14px;">📝 創製作任務</button>';
     html += '</div>';
     html += '</div>';
   });

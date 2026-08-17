@@ -2904,8 +2904,12 @@ function renderSiteGiantList() {
         html += '<input type="number" min="1" id="sg-item-qty-' + i + '-' + itemIdx + '" value="' + sgEsc(String(it.qty || 1)) + '" style="width:50px;padding:2px 4px;font-size:12px;" />';
         html += '<button id="sg-item-task-btn-' + i + '-' + itemIdx + '" onclick="sgCreateItemTask(' + i + ',' + itemIdx + ')" style="padding:3px 8px;font-size:11px;white-space:nowrap;">➕創任務</button>';
         html += '</div>';
-        html += '<div id="sg-item-task-result-' + i + '-' + itemIdx + '" style="font-size:11px;"></div>';
       }
+      html += '<div id="sg-item-task-result-' + i + '-' + itemIdx + '" style="font-size:11px;">';
+      if (it.taskLink) {
+        html += '<a href="' + sgEsc(it.taskLink) + '" target="_blank" rel="noopener">🔗 查看任務</a>';
+      }
+      html += '</div>';
       html += '</div>';
       html += '</div>';
     });

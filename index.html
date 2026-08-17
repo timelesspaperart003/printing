@@ -2785,13 +2785,16 @@ async function sgCreateItemTask(orderIdx, itemIdx) {
       qty: qty,
       role: getRole()
     });
+    console.log('createSiteGiantTask response', res);
     if (res && res.ok) {
       if (btn) { btn.textContent = '✅'; }
       if (resultEl) {
         if (res.notionUrl) {
           resultEl.innerHTML = '<a href="' + sgEsc(res.notionUrl) + '" target="_blank" rel="noopener">🔗 查看任務</a>';
         } else {
-          resultEl.textContent = '已建立，稍後重新整理查看';
+          // 暫時除錯：把觸發 webhook 的回應也顯示出來，方便排查為什麼查不到連結
+          resultEl.innerHTML = '已建立，稍後重新整理查看<br><span style="color:#999;">debug: '
+            + sgEsc(String(res.debugTriggerStatus || '')) + ' ' + sgEsc(String(res.debugTriggerBody || '')) + '</span>';
         }
       }
     } else {

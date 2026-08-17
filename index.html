@@ -2719,6 +2719,18 @@ async function sgCopyText(btn) {
   setTimeout(function() { btn.textContent = original; }, 1200);
 }
 
+// 通路顯示用暗語對照（篩選/資料層仍用原始 channel_name，只有顯示文字換過）
+var SG_CHANNEL_ALIASES = {
+  'Taiwan paper art': '官網',
+  'WooCommerce': '官網',
+  '蝦皮 - 雋永紙藝': '海鮮',
+  'mo+': '桃子',
+  '酷澎': '酷C'
+};
+function sgChannelLabel(name) {
+  return SG_CHANNEL_ALIASES[name] || name || '';
+}
+
 // SiteGiant order_status 中文對照（未列出的狀態原樣顯示）
 var SG_STATUS_LABELS = { 'Paid': '待處理', 'Processed': '已安排出貨' };
 function sgStatusLabel(status) {
@@ -2755,22 +2767,39 @@ async function sgSaveNote(i) {
   }
 }
 
-// 送給 n8n 建 Notion 製作任務（GAS 端組 payload 再 UrlFetchApp 打出去，避免瀏覽器直打 n8n 的 CORS 問題）
-async function sgCreateMakeTask(i) {
-  var o = siteGiantOrders[i];
+// 依單一品項建立製作任務（GAS 端寫一列進「創製作任務記錄」+ 觸發 n8n，避免瀏覽器直打 n8n 的 CORS 問題）
+async function sgCreateItemTask(orderIdx, itemIdx) {
+  var o = siteGiantOrders[orderIdx];
   if (!o) return;
-  var btn = document.getElementById('sg-task-btn-' + i);
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 送出中...'; }
+  var qtyEl = document.getElementById('sg-item-qty-' + orderIdx + '-' + itemIdx);
+  var qty = qtyEl ? (parseInt(qtyEl.value, 10) || 1) : 1;
+  var btn = document.getElementById('sg-item-task-btn-' + orderIdx + '-' + itemIdx);
+  var resultEl = document.getElementById('sg-item-task-result-' + orderIdx + '-' + itemIdx);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  if (resultEl) resultEl.textContent = '';
   try {
-    var res = await gasAPI({ action: 'createSiteGiantTask', order_id: o.order_id, role: getRole() });
+    var res = await gasAPI({
+      action: 'createSiteGiantTask',
+      order_id: o.order_id,
+      item_index: itemIdx,
+      qty: qty,
+      role: getRole()
+    });
     if (res && res.ok) {
-      if (btn) { btn.textContent = '✅ 已送出'; }
+      if (btn) { btn.textContent = '✅'; }
+      if (resultEl) {
+        if (res.notionUrl) {
+          resultEl.innerHTML = '<a href="' + sgEsc(res.notionUrl) + '" target="_blank" rel="noopener">🔗 查看任務</a>';
+        } else {
+          resultEl.textContent = '已建立，稍後重新整理查看';
+        }
+      }
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = '📝 創製作任務'; }
+      if (btn) { btn.disabled = false; btn.textContent = '➕創任務'; }
       alert('建立任務失敗：' + (res && res.error ? res.error : '未知錯誤'));
     }
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = '📝 創製作任務'; }
+    if (btn) { btn.disabled = false; btn.textContent = '➕創任務'; }
     alert('建立任務失敗：' + e.message);
   }
 }
@@ -2810,7 +2839,7 @@ function renderSiteGiantList() {
   html += '</select>';
   html += '<select id="sg-filter-channel" onchange="sgFilter()" style="flex:1;">';
   html += '<option value="">全部通路</option>';
-  channels.forEach(function(c) { html += '<option value="' + sgEsc(c) + '">' + sgEsc(c) + '</option>'; });
+  channels.forEach(function(c) { html += '<option value="' + sgEsc(c) + '">' + sgEsc(sgChannelLabel(c)) + '</option>'; });
   html += '</select>';
   html += '<select id="sg-filter-carrier" onchange="sgFilter()" style="flex:1;">';
   html += '<option value="">全部運送方式</option>';
@@ -2824,7 +2853,7 @@ function renderSiteGiantList() {
     html += '<div class="sg-card" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" data-status="' + sgEsc(o.order_status || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
     html += '<div style="display:flex;justify-content:space-between;gap:8px;">';
     html += '<div style="font-weight:600;font-size:14px;">' + sgEsc(o.recipient_name || '(無收件人)') + '</div>';
-    html += '<div style="font-size:12px;color:var(--text-muted);white-space:nowrap;">' + sgEsc(o.channel_name || '') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text-muted);white-space:nowrap;">' + sgEsc(sgChannelLabel(o.channel_name)) + '</div>';
     html += '</div>';
     var sgOrderNo = o.marketplace_order_id || o.order_id || '';
     html += '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
@@ -2839,21 +2868,30 @@ function renderSiteGiantList() {
     if (o.ship_by_date) html += '<div style="font-size:12px;color:var(--danger);margin-top:2px;">出貨期限 ' + sgEsc(o.ship_by_date) + '</div>';
     if (o.customer_remark) html += '<div style="font-size:12px;background:#fff8e1;border-left:3px solid #f9a825;padding:6px 8px;border-radius:4px;margin-top:6px;">💬 客戶留言：' + sgEsc(o.customer_remark) + '</div>';
     html += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">';
-    (o.items || []).forEach(function(it) {
-      html += '<div style="display:flex;gap:10px;align-items:center;padding:6px;background:var(--bg,#f7f7f7);border-radius:8px;">';
+    (o.items || []).forEach(function(it, itemIdx) {
+      html += '<div style="display:flex;gap:10px;align-items:center;padding:6px;background:var(--bg,#f7f7f7);border-radius:8px;flex-wrap:wrap;">';
       if (it.img) {
         html += '<img src="' + it.img + '" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0;" />';
       } else {
         html += '<div style="width:72px;height:72px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:#999;border:1px dashed #ccc;border-radius:8px;text-align:center;line-height:1.3;">📷<br>待補圖</div>';
       }
-      html += '<div style="flex:1;min-width:0;">';
+      html += '<div style="flex:1;min-width:120px;">';
       html += '<div style="font-size:13px;font-weight:600;">' + sgEsc(it.name || '') + '</div>';
       if (it.variation) html += '<div style="font-size:11px;color:var(--text-muted);">' + sgEsc(it.variation) + '</div>';
       html += '<div style="font-size:11px;color:var(--text-muted);font-family:monospace;">SKU ' + sgEsc(it.sku || '-')
         + (it.isku ? '　iSKU ' + sgEsc(it.isku) : '')
         + (it.loc ? '　📍' + sgEsc(it.loc) : '') + '</div>';
       html += '</div>';
+      html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">';
       html += '<div style="font-size:15px;font-weight:700;white-space:nowrap;">x' + sgEsc(String(it.qty || '')) + '</div>';
+      if (getRole() === 'admin') {
+        html += '<div style="display:flex;gap:4px;align-items:center;">';
+        html += '<input type="number" min="1" id="sg-item-qty-' + i + '-' + itemIdx + '" value="' + sgEsc(String(it.qty || 1)) + '" style="width:50px;padding:2px 4px;font-size:12px;" />';
+        html += '<button id="sg-item-task-btn-' + i + '-' + itemIdx + '" onclick="sgCreateItemTask(' + i + ',' + itemIdx + ')" style="padding:3px 8px;font-size:11px;white-space:nowrap;">➕創任務</button>';
+        html += '</div>';
+        html += '<div id="sg-item-task-result-' + i + '-' + itemIdx + '" style="font-size:11px;"></div>';
+      }
+      html += '</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -2863,9 +2901,6 @@ function renderSiteGiantList() {
     html += '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
-    if (getRole() === 'admin') {
-      html += '<button id="sg-task-btn-' + i + '" onclick="sgCreateMakeTask(' + i + ')" style="flex:1;padding:9px;font-size:14px;">📝 創製作任務</button>';
-    }
     html += '</div>';
     html += '</div>';
   });
@@ -2895,7 +2930,7 @@ function sgItemsRows(o, showImg) {
 // 出貨單：撿貨清單＋運送單合併成一張（收件人/物流資訊 + 含照片的商品明細）
 function sgCombinedHtml(o) {
   var h = '<div class="doc">';
-  h += '<div class="hd"><div class="t">出貨單</div><div class="meta">' + sgEsc(o.channel_name || '') + '　單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '</div></div>';
+  h += '<div class="hd"><div class="t">出貨單</div><div class="meta">' + sgEsc(sgChannelLabel(o.channel_name)) + '　單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '</div></div>';
   h += '<table class="rcpt">';
   h += '<tr><td class="lb">收件人</td><td class="vl big">' + sgEsc(o.recipient_name || '') + '</td></tr>';
   h += '<tr><td class="lb">電話</td><td class="vl">' + sgEsc(o.recipient_phone || '') + '</td></tr>';

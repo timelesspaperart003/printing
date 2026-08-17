@@ -2686,6 +2686,31 @@ function sgFilter() {
   });
 }
 
+// 複製按鈕自己的文字當回饋（成功/失敗），用完還原
+async function sgCopyText(btn) {
+  var text = btn.getAttribute('data-copy') || '';
+  var original = btn.textContent;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    btn.textContent = '✅ 已複製';
+  } catch (e) {
+    btn.textContent = '❌ 失敗';
+  }
+  setTimeout(function() { btn.textContent = original; }, 1200);
+}
+
 // SiteGiant order_status 中文對照（未列出的狀態原樣顯示）
 var SG_STATUS_LABELS = { 'Paid': '待處理', 'Processed': '已安排出貨' };
 function sgStatusLabel(status) {
@@ -2773,7 +2798,12 @@ function renderSiteGiantList() {
     html += '<div style="font-weight:600;font-size:14px;">' + sgEsc(o.recipient_name || '(無收件人)') + '</div>';
     html += '<div style="font-size:12px;color:var(--text-muted);white-space:nowrap;">' + sgEsc(o.channel_name || '') + '</div>';
     html += '</div>';
-    html += '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '　·　' + sgEsc((o.order_time || '').substring(0, 16)) + '</div>';
+    var sgOrderNo = o.marketplace_order_id || o.order_id || '';
+    html += '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
+    html += '<span>單號 ' + sgEsc(sgOrderNo) + '</span>';
+    html += '<button type="button" data-copy="' + sgEsc(sgOrderNo) + '" onclick="sgCopyText(this)" style="padding:1px 7px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;">📋 複製</button>';
+    html += '<span>·　' + sgEsc((o.order_time || '').substring(0, 16)) + '</span>';
+    html += '</div>';
     html += '<div style="font-size:12px;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">';
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;' + sgStatusBadgeStyle(o.order_status) + 'font-weight:600;">' + sgEsc(sgStatusLabel(o.order_status)) + '</span>';
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--surface-2,#eef);color:var(--accent,#333);font-weight:600;">🚚 ' + sgEsc(o.shipping_carrier || '未標示運送方式') + '</span>';

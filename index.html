@@ -211,6 +211,13 @@ function setApiKey(k) {
 }
 function clearApiKey() {
   sessionStorage.removeItem('api_key');
+  sessionStorage.removeItem('sg_role');
+}
+function getRole() {
+  return sessionStorage.getItem('sg_role') || '';
+}
+function setRole(r) {
+  sessionStorage.setItem('sg_role', r || '');
 }
 
 async function doLogin() {
@@ -229,6 +236,7 @@ async function doLogin() {
     var data = await res.json();
     if (data.ok && data.apiKey) {
       setApiKey(data.apiKey);
+      setRole(data.role || '');
       showApp();
     } else {
       errEl.textContent = '密碼錯誤';
@@ -2754,7 +2762,7 @@ async function sgCreateMakeTask(i) {
   var btn = document.getElementById('sg-task-btn-' + i);
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 送出中...'; }
   try {
-    var res = await gasAPI({ action: 'createSiteGiantTask', order_id: o.order_id });
+    var res = await gasAPI({ action: 'createSiteGiantTask', order_id: o.order_id, role: getRole() });
     if (res && res.ok) {
       if (btn) { btn.textContent = '✅ 已送出'; }
     } else {
@@ -2855,7 +2863,9 @@ function renderSiteGiantList() {
     html += '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
-    html += '<button id="sg-task-btn-' + i + '" onclick="sgCreateMakeTask(' + i + ')" style="flex:1;padding:9px;font-size:14px;">📝 創製作任務</button>';
+    if (getRole() === 'admin') {
+      html += '<button id="sg-task-btn-' + i + '" onclick="sgCreateMakeTask(' + i + ')" style="flex:1;padding:9px;font-size:14px;">📝 創製作任務</button>';
+    }
     html += '</div>';
     html += '</div>';
   });

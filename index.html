@@ -2671,16 +2671,29 @@ function sgFilter() {
   var kw = (box ? box.value : '').trim().toLowerCase();
   var chSel = document.getElementById('sg-filter-channel');
   var scSel = document.getElementById('sg-filter-carrier');
+  var stSel = document.getElementById('sg-filter-status');
   var ch = chSel ? chSel.value : '';
   var sc = scSel ? scSel.value : '';
+  var st = stSel ? stSel.value : '';
   var cards = document.querySelectorAll('#sg-list .sg-card');
   cards.forEach(function(c) {
     var hay = c.getAttribute('data-hay') || '';
     var matchKw = !kw || hay.indexOf(kw) >= 0;
     var matchCh = !ch || c.getAttribute('data-channel') === ch;
     var matchSc = !sc || c.getAttribute('data-carrier') === sc;
-    c.style.display = (matchKw && matchCh && matchSc) ? 'block' : 'none';
+    var matchSt = !st || c.getAttribute('data-status') === st;
+    c.style.display = (matchKw && matchCh && matchSc && matchSt) ? 'block' : 'none';
   });
+}
+
+// SiteGiant order_status 中文對照（未列出的狀態原樣顯示）
+var SG_STATUS_LABELS = { 'Paid': '待處理', 'Processed': '已安排出貨' };
+function sgStatusLabel(status) {
+  return SG_STATUS_LABELS[status] || status || '未知狀態';
+}
+function sgStatusBadgeStyle(status) {
+  if (status === 'Processed') return 'background:#d3e9d7;color:#1b6e2a;';
+  return 'background:#fdecc8;color:#a66a00;'; // Paid / 其他，先用同一色
 }
 
 // 儲存人工備註（存在後端獨立分頁，不受 SiteGiant 同步影響）
@@ -2729,6 +2742,7 @@ function renderSiteGiantList() {
   }
   var channels = sgBuildFilterOptions(siteGiantOrders, 'channel_name');
   var carriers = sgBuildFilterOptions(siteGiantOrders, 'shipping_carrier');
+  var statuses = sgBuildFilterOptions(siteGiantOrders, 'order_status');
 
   var html = '';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2737,6 +2751,10 @@ function renderSiteGiantList() {
   html += '</div>';
   html += '<input type="text" id="sg-search" oninput="sgFilter()" placeholder="搜尋 單號 / 收件人 / 商品..." style="margin-bottom:8px;" />';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
+  html += '<select id="sg-filter-status" onchange="sgFilter()" style="flex:1;">';
+  html += '<option value="">全部狀態</option>';
+  statuses.forEach(function(s) { html += '<option value="' + sgEsc(s) + '">' + sgEsc(sgStatusLabel(s)) + '</option>'; });
+  html += '</select>';
   html += '<select id="sg-filter-channel" onchange="sgFilter()" style="flex:1;">';
   html += '<option value="">全部通路</option>';
   channels.forEach(function(c) { html += '<option value="' + sgEsc(c) + '">' + sgEsc(c) + '</option>'; });
@@ -2750,13 +2768,16 @@ function renderSiteGiantList() {
   html += '<div id="sg-list">';
   siteGiantOrders.forEach(function(o, i) {
     var hay = ((o.marketplace_order_id || '') + ' ' + (o.order_id || '') + ' ' + (o.recipient_name || '') + ' ' + (o.items_summary || '')).toLowerCase();
-    html += '<div class="sg-card" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
+    html += '<div class="sg-card" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" data-status="' + sgEsc(o.order_status || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
     html += '<div style="display:flex;justify-content:space-between;gap:8px;">';
     html += '<div style="font-weight:600;font-size:14px;">' + sgEsc(o.recipient_name || '(無收件人)') + '</div>';
     html += '<div style="font-size:12px;color:var(--text-muted);white-space:nowrap;">' + sgEsc(o.channel_name || '') + '</div>';
     html += '</div>';
     html += '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">單號 ' + sgEsc(o.marketplace_order_id || o.order_id) + '　·　' + sgEsc((o.order_time || '').substring(0, 16)) + '</div>';
-    html += '<div style="font-size:12px;margin-top:4px;"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--surface-2,#eef);color:var(--accent,#333);font-weight:600;">🚚 ' + sgEsc(o.shipping_carrier || '未標示運送方式') + '</span></div>';
+    html += '<div style="font-size:12px;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">';
+    html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;' + sgStatusBadgeStyle(o.order_status) + 'font-weight:600;">' + sgEsc(sgStatusLabel(o.order_status)) + '</span>';
+    html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--surface-2,#eef);color:var(--accent,#333);font-weight:600;">🚚 ' + sgEsc(o.shipping_carrier || '未標示運送方式') + '</span>';
+    html += '</div>';
     if (o.ship_by_date) html += '<div style="font-size:12px;color:var(--danger);margin-top:2px;">出貨期限 ' + sgEsc(o.ship_by_date) + '</div>';
     if (o.customer_remark) html += '<div style="font-size:12px;background:#fff8e1;border-left:3px solid #f9a825;padding:6px 8px;border-radius:4px;margin-top:6px;">💬 客戶留言：' + sgEsc(o.customer_remark) + '</div>';
     html += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">';

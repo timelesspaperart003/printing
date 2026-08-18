@@ -2992,6 +2992,10 @@ function renderSiteGiantList() {
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;' + sgStatusBadgeStyle(o.order_status) + 'font-weight:600;">' + sgEsc(sgStatusLabel(o.order_status)) + '</span>';
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--surface-2,#eef);color:var(--accent,#333);font-weight:600;">🚚 ' + sgEsc(o.shipping_carrier || '未標示運送方式') + '</span>';
     html += '</div>';
+    html += '<div style="position:sticky;top:0;z-index:2;background:var(--surface);display:flex;align-items:center;gap:14px;margin-top:8px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px;">';
+    html += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="sg-arranged-' + i + '" ' + (o.arranged ? 'checked' : '') + ' onchange="sgToggleArranged(' + i + ', this)" /> 已安排</label>';
+    html += '<span id="sg-packed-box-' + i + '">' + sgPackedBoxHtml(i, o) + '</span>';
+    html += '</div>';
     if (o.customer_remark) html += '<div style="font-size:12px;background:#fff8e1;border-left:3px solid #f9a825;padding:6px 8px;border-radius:4px;margin-top:6px;">💬 客戶留言：' + sgEsc(o.customer_remark) + '</div>';
     html += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">';
     (o.items || []).forEach(function(it, itemIdx) {
@@ -3045,10 +3049,6 @@ function renderSiteGiantList() {
     html += '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
-    html += '</div>';
-    html += '<div style="display:flex;align-items:center;gap:14px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:12px;">';
-    html += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="sg-arranged-' + i + '" ' + (o.arranged ? 'checked' : '') + ' onchange="sgToggleArranged(' + i + ', this)" /> 已安排</label>';
-    html += '<span id="sg-packed-box-' + i + '">' + sgPackedBoxHtml(i, o) + '</span>';
     html += '</div>';
     html += '</div>';
   });

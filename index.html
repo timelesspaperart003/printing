@@ -2784,21 +2784,39 @@ function sgToggleArranged(i, el) {
   sgSavePackStatus(i, 'arranged', el.checked, '');
 }
 
-function sgTogglePacked(i, el) {
-  if (!el.checked) {
-    sgSavePackStatus(i, 'packed', false, '');
-    return;
+var SG_PACKER_NAMES = ['姵蓉', '尤', '強', '培', '晴', 'R'];
+
+// 「已包貨」用按鈕呈現，不用打字：未包貨顯示一顆按鈕，點了展開人員選擇按鈕列；已包貨顯示狀態+可點掉重選
+function sgPackedBoxHtml(i, o) {
+  if (o.packed) {
+    return '<button type="button" onclick="sgUnpack(' + i + ')" style="padding:2px 10px;font-size:12px;border-radius:6px;background:#e8f5e9;border:1px solid #a5d6a7;color:#1b6e2a;cursor:pointer;">✅ 已包貨（' + sgEsc(o.packer || '') + '）</button>';
   }
-  var names = ['姵蓉', '尤', '強', '培', '晴', 'R'];
-  var picked = prompt('請輸入包貨人代號（' + names.join('/') + '）：', '');
-  if (picked === null) { el.checked = false; return; }
-  picked = picked.trim();
-  if (names.indexOf(picked) === -1) {
-    alert('請輸入正確的包貨人代號：' + names.join('、'));
-    el.checked = false;
-    return;
-  }
-  sgSavePackStatus(i, 'packed', true, picked);
+  return '<button type="button" onclick="sgShowPackerChoices(' + i + ')" style="padding:2px 10px;font-size:12px;border-radius:6px;cursor:pointer;">☐ 已包貨</button>';
+}
+
+function sgShowPackerChoices(i) {
+  var box = document.getElementById('sg-packed-box-' + i);
+  if (!box) return;
+  var html = '<span style="font-size:11px;color:var(--text-muted);margin-right:2px;">選包貨人：</span>';
+  SG_PACKER_NAMES.forEach(function(n) {
+    html += '<button type="button" onclick="sgConfirmPacked(' + i + ',\'' + n + '\')" style="padding:2px 9px;font-size:12px;margin-right:3px;border-radius:6px;cursor:pointer;">' + n + '</button>';
+  });
+  html += '<button type="button" onclick="sgCancelPackerChoice(' + i + ')" style="padding:2px 9px;font-size:12px;border-radius:6px;cursor:pointer;color:var(--text-muted);">取消</button>';
+  box.innerHTML = html;
+}
+
+function sgCancelPackerChoice(i) {
+  var box = document.getElementById('sg-packed-box-' + i);
+  var o = siteGiantOrders[i];
+  if (box && o) box.innerHTML = sgPackedBoxHtml(i, o);
+}
+
+function sgConfirmPacked(i, name) {
+  sgSavePackStatus(i, 'packed', true, name);
+}
+
+function sgUnpack(i) {
+  sgSavePackStatus(i, 'packed', false, '');
 }
 
 async function sgSavePackStatus(i, field, value, packer) {
@@ -2812,15 +2830,19 @@ async function sgSavePackStatus(i, field, value, packer) {
       } else {
         o.packed = value;
         o.packer = packer || '';
-        var labelEl = document.getElementById('sg-packer-label-' + i);
-        if (labelEl) labelEl.textContent = (o.packed && o.packer) ? '（' + o.packer + '）' : '';
+        var box = document.getElementById('sg-packed-box-' + i);
+        if (box) box.innerHTML = sgPackedBoxHtml(i, o);
       }
       sgApplyCardStyle(i);
     } else {
       alert('儲存失敗：' + (res && res.error ? res.error : '未知錯誤'));
-      var elId = field === 'arranged' ? 'sg-arranged-' + i : 'sg-packed-' + i;
-      var el = document.getElementById(elId);
-      if (el) el.checked = !value;
+      if (field === 'arranged') {
+        var el = document.getElementById('sg-arranged-' + i);
+        if (el) el.checked = !value;
+      } else {
+        var box2 = document.getElementById('sg-packed-box-' + i);
+        if (box2 && o) box2.innerHTML = sgPackedBoxHtml(i, o);
+      }
     }
   } catch (e) {
     alert('儲存失敗：' + e.message);
@@ -2966,10 +2988,6 @@ function renderSiteGiantList() {
     html += '<button type="button" data-copy="' + sgEsc(sgOrderNo) + '" onclick="sgCopyText(this)" style="padding:1px 7px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;">📋 複製</button>';
     html += '<span>·　' + sgEsc((o.order_time || '').substring(0, 16)) + '</span>';
     html += '</div>';
-    html += '<div style="display:flex;align-items:center;gap:14px;margin-top:6px;font-size:12px;">';
-    html += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="sg-arranged-' + i + '" ' + (o.arranged ? 'checked' : '') + ' onchange="sgToggleArranged(' + i + ', this)" /> 已安排</label>';
-    html += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="sg-packed-' + i + '" ' + (o.packed ? 'checked' : '') + ' onchange="sgTogglePacked(' + i + ', this)" /> 已包貨<span id="sg-packer-label-' + i + '">' + ((o.packed && o.packer) ? '（' + sgEsc(o.packer) + '）' : '') + '</span></label>';
-    html += '</div>';
     html += '<div style="font-size:12px;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">';
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;' + sgStatusBadgeStyle(o.order_status) + 'font-weight:600;">' + sgEsc(sgStatusLabel(o.order_status)) + '</span>';
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--surface-2,#eef);color:var(--accent,#333);font-weight:600;">🚚 ' + sgEsc(o.shipping_carrier || '未標示運送方式') + '</span>';
@@ -3028,6 +3046,10 @@ function renderSiteGiantList() {
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
     html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:14px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:12px;">';
+    html += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="sg-arranged-' + i + '" ' + (o.arranged ? 'checked' : '') + ' onchange="sgToggleArranged(' + i + ', this)" /> 已安排</label>';
+    html += '<span id="sg-packed-box-' + i + '">' + sgPackedBoxHtml(i, o) + '</span>';
+    html += '</div>';
     html += '</div>';
   });
   html += '</div>';
@@ -3064,7 +3086,7 @@ function sgCombinedHtml(o) {
   h += '</table>';
   h += '<table class="info">';
   h += '<tr><td class="lb">出貨期限</td><td>' + sgEsc(o.ship_by_date || '-') + '</td><td class="lb">物流</td><td>' + sgEsc(o.shipping_carrier || '') + '</td></tr>';
-  h += '<tr><td class="lb">追蹤碼</td><td>' + sgEsc(o.tracking_no || '') + '</td><td class="lb">付款</td><td>' + sgEsc(o.payment_method || '') + (o.total_amount ? ('　$' + sgEsc(o.total_amount)) : '') + '</td></tr>';
+  h += '<tr><td class="lb">追蹤碼</td><td>' + sgEsc(o.tracking_no || '') + '</td><td class="lb">付款</td><td>' + sgEsc(o.payment_method || '') + '</td></tr>';
   h += '</table>';
   h += '<table class="it"><thead><tr><th class="ph">照片</th><th>商品名稱</th><th class="sku">SKU</th><th class="loc">📍儲位</th><th class="qty">數量</th></tr></thead><tbody>';
   h += sgItemsRows(o, true);

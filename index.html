@@ -150,9 +150,12 @@
 </div>
 
 <div class="app" id="app-main" style="display:none;">
-  <div class="header">
-    <h1>出貨單列印工具</h1>
-    <p id="today-date"></p>
+  <div class="header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+    <div>
+      <h1>出貨單列印工具</h1>
+      <p id="today-date"></p>
+    </div>
+    <button onclick="doLogout()" style="padding:6px 12px;font-size:13px;white-space:nowrap;">登出</button>
   </div>
   <div id="view-search">
     <div class="card">
@@ -265,6 +268,11 @@ function showLogin() {
     var p = document.getElementById('login-pwd');
     if (p) p.focus();
   }, 100);
+}
+
+function doLogout() {
+  clearApiKey();
+  showLogin();
 }
 
 // 啟動時檢查：若已有 api_key 則直接進入 app，否則顯示登入

@@ -2970,9 +2970,31 @@ function renderSiteGiantList() {
   html += '</div>';
   html += '<button onclick="printAllSiteGiantPick()" style="width:100%;margin-bottom:12px;background:#1e7e34;color:#fff;border-color:#1e7e34;">🖨️ 全部出貨單（一次列印）</button>';
   html += '<div id="sg-list">';
+
+  // 依狀態分三區：待安排 / 已安排(待包貨) / 已包貨，各區內維持原本順序
+  var groupTodo = [], groupArranged = [], groupPacked = [];
   siteGiantOrders.forEach(function(o, i) {
-    var hay = ((o.marketplace_order_id || '') + ' ' + (o.order_id || '') + ' ' + (o.recipient_name || '') + ' ' + (o.items_summary || '')).toLowerCase();
-    html += '<div class="sg-card" id="sg-card-' + i + '" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" data-status="' + sgEsc(o.order_status || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);transition:background 0.3s,opacity 0.4s;' + sgCardStateStyle(o) + '">';
+    if (o.packed) groupPacked.push(i);
+    else if (o.arranged) groupArranged.push(i);
+    else groupTodo.push(i);
+  });
+  function renderSgGroup(title, badgeStyle, indices) {
+    if (!indices.length) return;
+    html += '<div style="font-weight:700;font-size:13px;margin:16px 0 8px;padding:4px 10px;border-radius:6px;display:inline-block;' + badgeStyle + '">' + title + '（' + indices.length + '）</div>';
+    indices.forEach(function(i) { html += sgOrderCardHtml(siteGiantOrders[i], i); });
+  }
+  renderSgGroup('🔴 待安排', 'background:#ffe2dd;color:#b8342e;', groupTodo);
+  renderSgGroup('🟡 已安排・待包貨', 'background:#fdecc8;color:#a66a00;', groupArranged);
+  renderSgGroup('🟢 已包貨', 'background:#d3e9d7;color:#1b6e2a;', groupPacked);
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function sgOrderCardHtml(o, i) {
+  var html = '';
+  var hay = ((o.marketplace_order_id || '') + ' ' + (o.order_id || '') + ' ' + (o.recipient_name || '') + ' ' + (o.items_summary || '')).toLowerCase();
+  html += '<div class="sg-card" id="sg-card-' + i + '" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" data-status="' + sgEsc(o.order_status || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
     html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">';
     html += '<div style="font-weight:600;font-size:14px;">' + sgEsc(o.recipient_name || '(無收件人)') + '</div>';
     html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">';
@@ -2992,7 +3014,7 @@ function renderSiteGiantList() {
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;' + sgStatusBadgeStyle(o.order_status) + 'font-weight:600;">' + sgEsc(sgStatusLabel(o.order_status)) + '</span>';
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--surface-2,#eef);color:var(--accent,#333);font-weight:600;">🚚 ' + sgEsc(o.shipping_carrier || '未標示運送方式') + '</span>';
     html += '</div>';
-    html += '<div style="position:sticky;top:0;z-index:2;background:var(--surface);display:flex;align-items:center;gap:14px;margin-top:8px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px;">';
+    html += '<div style="display:flex;align-items:center;gap:14px;margin-top:8px;padding-bottom:6px;border-bottom:1px dashed var(--border);font-size:12px;">';
     html += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="sg-arranged-' + i + '" ' + (o.arranged ? 'checked' : '') + ' onchange="sgToggleArranged(' + i + ', this)" /> 已安排</label>';
     html += '<span id="sg-packed-box-' + i + '">' + sgPackedBoxHtml(i, o) + '</span>';
     html += '</div>';

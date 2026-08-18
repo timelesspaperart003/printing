@@ -2749,6 +2749,14 @@ function sgStatusBadgeStyle(status) {
   return 'background:#fdecc8;color:#a66a00;'; // Paid / 其他，先用同一色
 }
 
+// SiteGiant 官方庫存數量徽章：有貨綠色、缺貨(<=0)紅色
+function sgStockBadge(stock) {
+  var n = Number(stock);
+  if (isNaN(n)) return '';
+  var style = n > 0 ? 'background:#d3e9d7;color:#1b6e2a;' : 'background:#ffe2dd;color:#b8342e;';
+  return '<span style="display:inline-block;padding:1px 7px;border-radius:8px;font-weight:600;' + style + '">📦 庫存 ' + n + '</span>';
+}
+
 // 儲存人工備註（存在後端獨立分頁，不受 SiteGiant 同步影響）
 async function sgSaveNote(i) {
   var o = siteGiantOrders[i];
@@ -2908,6 +2916,9 @@ function renderSiteGiantList() {
       html += '<div style="font-size:11px;color:var(--text-muted);font-family:monospace;">SKU ' + sgEsc(it.sku || '-')
         + (it.isku ? '　iSKU ' + sgEsc(it.isku) : '')
         + (it.loc ? '　📍' + sgEsc(it.loc) : '') + '</div>';
+      if (it.stock !== null && it.stock !== undefined) {
+        html += '<div style="font-size:11px;margin-top:2px;">' + sgStockBadge(it.stock) + '</div>';
+      }
       html += '</div>';
       html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">';
       html += '<div style="font-size:15px;font-weight:700;white-space:nowrap;">x' + sgEsc(String(it.qty || '')) + '</div>';
@@ -2920,6 +2931,8 @@ function renderSiteGiantList() {
       html += '<div id="sg-item-task-result-' + i + '-' + itemIdx + '" style="font-size:11px;">';
       if (it.taskLink) {
         html += '<a href="' + sgEsc(it.taskLink) + '" target="_blank" rel="noopener">🔗 查看任務</a>';
+      } else if (getRole() !== 'admin') {
+        html += '<span style="color:var(--text-muted);">－ 尚無任務</span>';
       }
       html += '</div>';
       html += '</div>';

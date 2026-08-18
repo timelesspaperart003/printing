@@ -2749,12 +2749,19 @@ function sgStatusBadgeStyle(status) {
   return 'background:#fdecc8;color:#a66a00;'; // Paid / 其他，先用同一色
 }
 
-// SiteGiant 官方庫存數量徽章：有貨綠色、缺貨(<=0)紅色
-function sgStockBadge(stock) {
-  var n = Number(stock);
-  if (isNaN(n)) return '';
-  var style = n > 0 ? 'background:#d3e9d7;color:#1b6e2a;' : 'background:#ffe2dd;color:#b8342e;';
-  return '<span style="display:inline-block;padding:1px 7px;border-radius:8px;font-weight:600;' + style + '">📦 庫存 ' + n + '</span>';
+// 多啦A夢快取庫存徽章：查不到黃色 --- ；有貨(主庫存>0)綠色；缺貨紅色，都顯示 主/待/代/半
+function sgStockNum(v) {
+  return (v === '' || v === null || v === undefined) ? '0' : String(v);
+}
+function sgStockBadge(stockInfo) {
+  if (!stockInfo) {
+    return '<span style="display:inline-block;padding:1px 7px;border-radius:8px;font-weight:600;background:#fdecc8;color:#a66a00;">📦 ---</span>';
+  }
+  var ok = Number(stockInfo.main) > 0;
+  var style = ok ? 'background:#d3e9d7;color:#1b6e2a;' : 'background:#ffe2dd;color:#b8342e;';
+  var detail = '主' + sgStockNum(stockInfo.main) + ' 待' + sgStockNum(stockInfo.pending)
+    + ' 代' + sgStockNum(stockInfo.outsource) + ' 半' + sgStockNum(stockInfo.semi);
+  return '<span style="display:inline-block;padding:1px 7px;border-radius:8px;font-weight:600;' + style + '">📦 ' + detail + '</span>';
 }
 
 // 儲存人工備註（存在後端獨立分頁，不受 SiteGiant 同步影響）
@@ -2916,9 +2923,7 @@ function renderSiteGiantList() {
       html += '<div style="font-size:11px;color:var(--text-muted);font-family:monospace;">SKU ' + sgEsc(it.sku || '-')
         + (it.isku ? '　iSKU ' + sgEsc(it.isku) : '')
         + (it.loc ? '　📍' + sgEsc(it.loc) : '') + '</div>';
-      if (it.stock !== null && it.stock !== undefined) {
-        html += '<div style="font-size:11px;margin-top:2px;">' + sgStockBadge(it.stock) + '</div>';
-      }
+      html += '<div style="font-size:11px;margin-top:2px;">' + sgStockBadge(it.stockInfo) + '</div>';
       if (it.remarkDetail) {
         html += '<div style="font-size:11px;margin-top:2px;color:var(--text-muted);">📝 ' + sgEsc(it.remarkDetail) + '</div>';
       }

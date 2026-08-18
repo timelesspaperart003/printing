@@ -2919,6 +2919,14 @@ function renderSiteGiantList() {
       if (it.stock !== null && it.stock !== undefined) {
         html += '<div style="font-size:11px;margin-top:2px;">' + sgStockBadge(it.stock) + '</div>';
       }
+      if (it.otherTaskLinks && it.otherTaskLinks.length) {
+        html += '<div style="font-size:11px;margin-top:2px;color:#a66a00;">⚠️ 同品項其他訂單有 ' + it.otherTaskLinks.length + ' 筆任務在跑，可能已有印切好的庫存材料可沿用：';
+        it.otherTaskLinks.slice(0, 3).forEach(function(link, li) {
+          html += ' <a href="' + sgEsc(link) + '" target="_blank" rel="noopener">#' + (li + 1) + '</a>';
+        });
+        if (it.otherTaskLinks.length > 3) html += ' 等';
+        html += '</div>';
+      }
       html += '</div>';
       html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">';
       html += '<div style="font-size:15px;font-weight:700;white-space:nowrap;">x' + sgEsc(String(it.qty || '')) + '</div>';

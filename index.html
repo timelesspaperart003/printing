@@ -2765,6 +2765,68 @@ function sgStockBadge(stockInfo) {
 }
 
 // 儲存人工備註（存在後端獨立分頁，不受 SiteGiant 同步影響）
+// 卡片背景/透明度：已包貨最優先(淡出)，其次已安排(淺綠)，都沒有維持原樣
+function sgCardStateStyle(o) {
+  if (o.packed) return 'opacity:0.45;';
+  if (o.arranged) return 'background:#e8f5e9;';
+  return '';
+}
+
+function sgApplyCardStyle(i) {
+  var card = document.getElementById('sg-card-' + i);
+  var o = siteGiantOrders[i];
+  if (!card || !o) return;
+  card.style.opacity = o.packed ? '0.45' : '1';
+  card.style.background = (!o.packed && o.arranged) ? '#e8f5e9' : '';
+}
+
+function sgToggleArranged(i, el) {
+  sgSavePackStatus(i, 'arranged', el.checked, '');
+}
+
+function sgTogglePacked(i, el) {
+  if (!el.checked) {
+    sgSavePackStatus(i, 'packed', false, '');
+    return;
+  }
+  var names = ['姵蓉', '尤', '強', '培', '晴', 'R'];
+  var picked = prompt('請輸入包貨人代號（' + names.join('/') + '）：', '');
+  if (picked === null) { el.checked = false; return; }
+  picked = picked.trim();
+  if (names.indexOf(picked) === -1) {
+    alert('請輸入正確的包貨人代號：' + names.join('、'));
+    el.checked = false;
+    return;
+  }
+  sgSavePackStatus(i, 'packed', true, picked);
+}
+
+async function sgSavePackStatus(i, field, value, packer) {
+  var o = siteGiantOrders[i];
+  if (!o) return;
+  try {
+    var res = await gasAPI({ action: 'saveSgPackStatus', order_id: o.order_id, field: field, value: value, packer: packer || '' });
+    if (res && res.ok) {
+      if (field === 'arranged') {
+        o.arranged = value;
+      } else {
+        o.packed = value;
+        o.packer = packer || '';
+        var labelEl = document.getElementById('sg-packer-label-' + i);
+        if (labelEl) labelEl.textContent = (o.packed && o.packer) ? '（' + o.packer + '）' : '';
+      }
+      sgApplyCardStyle(i);
+    } else {
+      alert('儲存失敗：' + (res && res.error ? res.error : '未知錯誤'));
+      var elId = field === 'arranged' ? 'sg-arranged-' + i : 'sg-packed-' + i;
+      var el = document.getElementById(elId);
+      if (el) el.checked = !value;
+    }
+  } catch (e) {
+    alert('儲存失敗：' + e.message);
+  }
+}
+
 async function sgSaveNote(i) {
   var o = siteGiantOrders[i];
   if (!o) return;
@@ -2888,7 +2950,7 @@ function renderSiteGiantList() {
   html += '<div id="sg-list">';
   siteGiantOrders.forEach(function(o, i) {
     var hay = ((o.marketplace_order_id || '') + ' ' + (o.order_id || '') + ' ' + (o.recipient_name || '') + ' ' + (o.items_summary || '')).toLowerCase();
-    html += '<div class="sg-card" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" data-status="' + sgEsc(o.order_status || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
+    html += '<div class="sg-card" id="sg-card-' + i + '" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" data-status="' + sgEsc(o.order_status || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);transition:background 0.3s,opacity 0.4s;' + sgCardStateStyle(o) + '">';
     html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">';
     html += '<div style="font-weight:600;font-size:14px;">' + sgEsc(o.recipient_name || '(無收件人)') + '</div>';
     html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">';
@@ -2903,6 +2965,10 @@ function renderSiteGiantList() {
     html += '<span>單號 ' + sgEsc(sgOrderNo) + '</span>';
     html += '<button type="button" data-copy="' + sgEsc(sgOrderNo) + '" onclick="sgCopyText(this)" style="padding:1px 7px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;">📋 複製</button>';
     html += '<span>·　' + sgEsc((o.order_time || '').substring(0, 16)) + '</span>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:14px;margin-top:6px;font-size:12px;">';
+    html += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="sg-arranged-' + i + '" ' + (o.arranged ? 'checked' : '') + ' onchange="sgToggleArranged(' + i + ', this)" /> 已安排</label>';
+    html += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="sg-packed-' + i + '" ' + (o.packed ? 'checked' : '') + ' onchange="sgTogglePacked(' + i + ', this)" /> 已包貨<span id="sg-packer-label-' + i + '">' + ((o.packed && o.packer) ? '（' + sgEsc(o.packer) + '）' : '') + '</span></label>';
     html += '</div>';
     html += '<div style="font-size:12px;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">';
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:10px;' + sgStatusBadgeStyle(o.order_status) + 'font-weight:600;">' + sgEsc(sgStatusLabel(o.order_status)) + '</span>';

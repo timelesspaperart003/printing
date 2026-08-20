@@ -2764,22 +2764,6 @@ function sgStockBadge(stockInfo) {
   return '<span style="display:inline-block;padding:1px 7px;border-radius:8px;font-weight:600;' + style + '">📦 ' + detail + '</span>';
 }
 
-// 儲存人工備註（存在後端獨立分頁，不受 SiteGiant 同步影響）
-// 卡片背景/透明度：已包貨最優先(淡出)，其次已安排(淺綠)，都沒有維持原樣
-function sgCardStateStyle(o) {
-  if (o.packed) return 'opacity:0.45;';
-  if (o.arranged) return 'background:#e8f5e9;';
-  return '';
-}
-
-function sgApplyCardStyle(i) {
-  var card = document.getElementById('sg-card-' + i);
-  var o = siteGiantOrders[i];
-  if (!card || !o) return;
-  card.style.opacity = o.packed ? '0.45' : '1';
-  card.style.background = (!o.packed && o.arranged) ? '#e8f5e9' : '';
-}
-
 function sgToggleArranged(i, el) {
   sgSavePackStatus(i, 'arranged', el.checked, '');
 }
@@ -2830,18 +2814,16 @@ async function sgSavePackStatus(i, field, value, packer) {
       } else {
         o.packed = value;
         o.packer = packer || '';
-        var box = document.getElementById('sg-packed-box-' + i);
-        if (box) box.innerHTML = sgPackedBoxHtml(i, o);
       }
-      sgApplyCardStyle(i);
+      renderSiteGiantList(); // 狀態變了要換分區，整份重繪
     } else {
       alert('儲存失敗：' + (res && res.error ? res.error : '未知錯誤'));
       if (field === 'arranged') {
         var el = document.getElementById('sg-arranged-' + i);
         if (el) el.checked = !value;
       } else {
-        var box2 = document.getElementById('sg-packed-box-' + i);
-        if (box2 && o) box2.innerHTML = sgPackedBoxHtml(i, o);
+        var box = document.getElementById('sg-packed-box-' + i);
+        if (box && o) box.innerHTML = sgPackedBoxHtml(i, o);
       }
     }
   } catch (e) {
@@ -3072,10 +3054,8 @@ function sgOrderCardHtml(o, i) {
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
     html += '</div>';
-    html += '</div>';
-  });
   html += '</div>';
-  el.innerHTML = html;
+  return html;
 }
 
 function sgItemsRows(o, showImg) {

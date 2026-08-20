@@ -2764,6 +2764,13 @@ function sgStockBadge(stockInfo) {
   return '<span style="display:inline-block;padding:1px 7px;border-radius:8px;font-weight:600;' + style + '">📦 ' + detail + '</span>';
 }
 
+// 卡片背景/透明度：已包貨最優先(淡出)，其次已安排(淺綠)，都沒有維持原樣
+function sgCardStateStyle(o) {
+  if (o.packed) return 'opacity:0.45;';
+  if (o.arranged) return 'background:#e8f5e9;';
+  return '';
+}
+
 function sgToggleArranged(i, el) {
   sgSavePackStatus(i, 'arranged', el.checked, '');
 }
@@ -2976,7 +2983,7 @@ function renderSiteGiantList() {
 function sgOrderCardHtml(o, i) {
   var html = '';
   var hay = ((o.marketplace_order_id || '') + ' ' + (o.order_id || '') + ' ' + (o.recipient_name || '') + ' ' + (o.items_summary || '')).toLowerCase();
-  html += '<div class="sg-card" id="sg-card-' + i + '" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" data-status="' + sgEsc(o.order_status || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);">';
+  html += '<div class="sg-card" id="sg-card-' + i + '" data-hay="' + sgEsc(hay) + '" data-channel="' + sgEsc(o.channel_name || '') + '" data-carrier="' + sgEsc(o.shipping_carrier || '') + '" data-status="' + sgEsc(o.order_status || '') + '" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface);' + sgCardStateStyle(o) + '">';
     html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">';
     html += '<div style="font-weight:600;font-size:14px;">' + sgEsc(o.recipient_name || '(無收件人)') + '</div>';
     html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">';

@@ -2655,6 +2655,12 @@ document.getElementById("search-input").addEventListener("keydown", function(e) 
 // ========= SiteGiant 待出貨（Stage 2，獨立區塊，不動既有功能）=========
 // ==================================================================
 var siteGiantOrders = [];
+var sgHidePacked = localStorage.getItem('sg_hide_packed') === '1';
+function sgToggleHidePacked() {
+  sgHidePacked = !sgHidePacked;
+  localStorage.setItem('sg_hide_packed', sgHidePacked ? '1' : '0');
+  renderSiteGiantList();
+}
 
 function sgEsc(s) {
   return String(s == null ? '' : s)
@@ -2938,9 +2944,12 @@ function renderSiteGiantList() {
   var statuses = sgBuildFilterOptions(siteGiantOrders, 'order_status');
 
   var html = '';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap;">';
   html += '<div style="font-weight:600;">SiteGiant 待出貨 · ' + siteGiantOrders.length + ' 筆</div>';
+  html += '<div style="display:flex;gap:8px;">';
+  html += '<button onclick="sgToggleHidePacked()" style="padding:6px 12px;font-size:13px;">' + (sgHidePacked ? '👁 顯示已包貨' : '🙈 隱藏已包貨') + '</button>';
   html += '<button onclick="loadSiteGiant()" style="padding:6px 12px;font-size:13px;">🔄 重新整理</button>';
+  html += '</div>';
   html += '</div>';
   html += '<input type="text" id="sg-search" oninput="sgFilter()" placeholder="搜尋 單號 / 收件人 / 商品..." style="margin-bottom:8px;" />';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
@@ -2974,7 +2983,11 @@ function renderSiteGiantList() {
   }
   renderSgGroup('🔴 待安排', 'background:#ffe2dd;color:#b8342e;', groupTodo);
   renderSgGroup('🟡 已安排・待包貨', 'background:#fdecc8;color:#a66a00;', groupArranged);
-  renderSgGroup('🟢 已包貨', 'background:#d3e9d7;color:#1b6e2a;', groupPacked);
+  if (!sgHidePacked) {
+    renderSgGroup('🟢 已包貨', 'background:#d3e9d7;color:#1b6e2a;', groupPacked);
+  } else if (groupPacked.length) {
+    html += '<div style="font-size:12px;color:var(--text-muted);margin-top:16px;">🙈 已包貨 ' + groupPacked.length + ' 筆已隱藏</div>';
+  }
 
   html += '</div>';
   el.innerHTML = html;

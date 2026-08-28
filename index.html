@@ -115,6 +115,7 @@
     <div id="quicktag-name" style="font-size:20px;font-weight:700;margin-bottom:20px;word-break:break-all;"></div>
     <input type="number" id="quicktag-qty" min="1" value="1" style="width:100%;font-size:24px;text-align:center;padding:12px;border:1px solid var(--border,#ccc);border-radius:8px;margin-bottom:16px;" />
     <button onclick="quickTagPrint()" style="width:100%;padding:14px;font-size:16px;background:#1a1814;color:#fff;border:none;border-radius:8px;cursor:pointer;">🏷️ 列印標籤</button>
+    <div id="quicktag-font-slider" style="margin-top:14px;text-align:left;"></div>
   </div>
 </div>
 <!-- 密碼閘：未登入時顯示，登入後 JS 隱藏 -->
@@ -305,6 +306,7 @@ function showQuickTagGate(name) {
   } else {
     nameWrap.innerHTML = '<input type="text" id="quicktag-name-input" placeholder="輸入標籤名稱" style="width:100%;font-size:18px;text-align:center;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;" />';
   }
+  document.getElementById('quicktag-font-slider').innerHTML = tagFontSliderHtml('quick');
   setTimeout(function() {
     var q = name ? document.getElementById('quicktag-qty') : document.getElementById('quicktag-name-input');
     if (q) { q.focus(); if (q.select) q.select(); }
@@ -1297,7 +1299,8 @@ function renderDetail(detail) {
     + '<div class="field"><div class="field-label">商品資訊</div>'
     + '<div class="view-toggle"><button id="btn-card" class="active" onclick="switchView(\'card\')">卡片版</button><button id="btn-list" onclick="switchView(\'list\')">列表版</button></div>'
     + '<div id="product-area"><div class="status"><span class="spinner"></span>載入商品資訊...</div></div>'
-    + '<button type="button" onclick="taskTagPrint()" style="margin-top:8px;width:100%;padding:9px;font-size:14px;">🏷️ 列印標籤</button></div>'
+    + '<button type="button" onclick="taskTagPrint()" style="margin-top:8px;width:100%;padding:9px;font-size:14px;">🏷️ 列印標籤</button>'
+    + tagFontSliderHtml('task') + '</div>'
     + contactFields
     + '<div class="divider"></div>'
     + '<div class="field"><div class="field-label">出貨人員</div>'
@@ -2791,8 +2794,27 @@ function sgTagPrint(orderIdx) {
 }
 
 // 共用的 B6 標籤列印排版（一張切5個），給「訂單卡片內勾選」和「Notion按鈕極簡模式」共用
+// 標籤字體大小滑動桿：存 localStorage，三個列印入口(SiteGiant卡片/出貨單列印任務頁/Notion快印)共用同一個設定
+function getTagFontSize() {
+  var v = parseInt(localStorage.getItem('tagLabelFontSize'), 10);
+  return (!isNaN(v) && v >= 10 && v <= 48) ? v : 22;
+}
+function setTagFontSize(v) {
+  localStorage.setItem('tagLabelFontSize', v);
+}
+function tagFontSliderHtml(idSuffix) {
+  var v = getTagFontSize();
+  return '<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:6px;">'
+    + '<span style="white-space:nowrap;">標籤字體</span>'
+    + '<input type="range" min="10" max="48" value="' + v + '" id="tagfont-' + idSuffix + '" style="flex:1;" '
+    + 'oninput="document.getElementById(\'tagfontval-' + idSuffix + '\').textContent=this.value;setTagFontSize(this.value);" />'
+    + '<span id="tagfontval-' + idSuffix + '" style="width:24px;text-align:right;">' + v + '</span>pt'
+    + '</div>';
+}
+
 function sgPrintTagLabels(names) {
   var PER_SHEET = 5;
+  var fontSize = getTagFontSize();
   var html = '';
   for (var s = 0; s < names.length; s += PER_SHEET) {
     html += '<div class="sgtag-sheet">';
@@ -2808,7 +2830,7 @@ function sgPrintTagLabels(names) {
     "@page{size:128mm 182mm;margin:0;}",
     ".sgtag-sheet{width:128mm;height:182mm;display:flex;flex-direction:column;page-break-after:always;}",
     ".sgtag-sheet:last-child{page-break-after:auto;}",
-    ".sgtag-cell{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;font-size:22pt;font-weight:700;border-bottom:1px dashed #999;padding:4mm;word-break:break-all;}",
+    ".sgtag-cell{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;font-size:" + fontSize + "pt;font-weight:700;border-bottom:1px dashed #999;padding:4mm;word-break:break-all;}",
     ".sgtag-cell:last-child{border-bottom:none;}"
   ].join("");
   sgOpenPrint('標籤列印', css, html);
@@ -3202,6 +3224,7 @@ function sgOrderCardHtml(o, i) {
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
     html += '<button onclick="sgTagPrint(' + i + ')" style="flex:1;padding:9px;font-size:14px;">🏷️ 列印標籤</button>';
     html += '</div>';
+    html += tagFontSliderHtml('sg-' + i);
   html += '</div>';
   return html;
 }

@@ -108,6 +108,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
+<!-- Notion 按鈕帶 ?tagname=品名 進來的極簡列印模式：不用登入，只輸入張數 -->
+<div id="quicktag-gate" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#f7f5f2 0%,#ebe6de 100%);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
+  <div style="max-width:360px;width:100%;background:#fff;border-radius:16px;padding:2rem;box-shadow:0 10px 40px -10px rgba(0,0,0,0.15),0 2px 8px rgba(0,0,0,0.04);text-align:center;">
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">🏷️ 列印標籤</div>
+    <div id="quicktag-name" style="font-size:20px;font-weight:700;margin-bottom:20px;word-break:break-all;"></div>
+    <input type="number" id="quicktag-qty" min="1" value="1" style="width:100%;font-size:24px;text-align:center;padding:12px;border:1px solid var(--border,#ccc);border-radius:8px;margin-bottom:16px;" />
+    <button onclick="quickTagPrint()" style="width:100%;padding:14px;font-size:16px;background:#1a1814;color:#fff;border:none;border-radius:8px;cursor:pointer;">🏷️ 列印標籤</button>
+  </div>
+</div>
 <!-- 密碼閘：未登入時顯示，登入後 JS 隱藏 -->
 <div id="login-gate" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#f7f5f2 0%,#ebe6de 100%);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
   <div style="max-width:380px;width:100%;background:#fff;border-radius:16px;padding:2.5rem 2rem 2rem;box-shadow:0 10px 40px -10px rgba(0,0,0,0.15),0 2px 8px rgba(0,0,0,0.04);">
@@ -198,12 +207,6 @@
       <div class="status"><span class="spinner"></span>載入中...</div>
     </div>
   </div>
-  <div id="view-sgtag" style="display:none;">
-    <button class="ghost" onclick="backFromSgTag()">← 返回搜尋</button>
-    <div class="card" id="sgtag-content">
-      <div class="status"><span class="spinner"></span>載入中...</div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -265,9 +268,6 @@ function showApp() {
   document.getElementById('login-gate').style.display = 'none';
   document.getElementById('app-main').style.display = 'block';
   preloadShippingData();
-  // Notion 按鈕帶 ?sgtag=客N 進來，登入完直接跳到標籤列印畫面
-  var sgtagParam = new URLSearchParams(location.search).get('sgtag');
-  if (sgtagParam) loadSgTagView(sgtagParam);
 }
 
 function showLogin() {
@@ -284,11 +284,36 @@ function doLogout() {
   showLogin();
 }
 
-// 啟動時檢查：若已有 api_key 則直接進入 app，否則顯示登入
-if (getApiKey()) {
+// 啟動時檢查：若網址帶 ?tagname= 則進極簡標籤列印模式（不登入、不進主系統）；
+// 否則若已有 api_key 則直接進入 app，沒有則顯示登入
+var QUICKTAG_NAME = new URLSearchParams(location.search).get('tagname');
+if (QUICKTAG_NAME) {
+  showQuickTagGate(QUICKTAG_NAME);
+} else if (getApiKey()) {
   showApp();
 } else {
   showLogin();
+}
+
+function showQuickTagGate(name) {
+  document.getElementById('login-gate').style.display = 'none';
+  document.getElementById('app-main').style.display = 'none';
+  document.getElementById('quicktag-gate').style.display = 'flex';
+  document.getElementById('quicktag-name').textContent = name;
+  setTimeout(function() {
+    var q = document.getElementById('quicktag-qty');
+    if (q) { q.focus(); q.select(); }
+  }, 100);
+}
+
+function quickTagPrint() {
+  var name = document.getElementById('quicktag-name').textContent;
+  var qtyEl = document.getElementById('quicktag-qty');
+  var qty = parseInt(qtyEl.value, 10);
+  if (isNaN(qty) || qty <= 0) { alert('請輸入大於 0 的數量'); qtyEl.focus(); return; }
+  var names = [];
+  for (var i = 0; i < qty; i++) names.push(name);
+  sgPrintTagLabels(names);
 }
 
 // Enter 鍵觸發登入
@@ -2697,63 +2722,25 @@ function backFromSiteGiant() {
   document.getElementById("view-search").style.display = "block";
 }
 
-// ========== 標籤列印（Notion 任務按鈕帶「客N」進來，勾選訂單裡的品項印B6標籤）==========
-var sgTagOrder = null;
-
-async function loadSgTagView(custN) {
-  document.getElementById("view-search").style.display = "none";
-  document.getElementById("view-sitegiant").style.display = "none";
-  document.getElementById("view-sgtag").style.display = "block";
-  var el = document.getElementById("sgtag-content");
-  el.innerHTML = '<div class="status"><span class="spinner"></span>載入中...</div>';
-  try {
-    var data = await gasAPI({ action: "siteGiantOrderByCustN", cust_n: custN });
-    if (!data || !data.ok) throw new Error((data && data.error) || "找不到訂單");
-    sgTagOrder = data.order;
-    renderSgTagView();
-  } catch (e) {
-    el.innerHTML = '<div class="status error">載入失敗：' + sgEsc(e.message) + '</div>'
-      + '<button onclick="loadSgTagView(\'' + sgEsc(custN) + '\')" style="margin-top:10px;width:100%;">🔄 再試一次</button>';
-  }
-}
-
-function backFromSgTag() {
-  document.getElementById("view-sgtag").style.display = "none";
-  document.getElementById("view-search").style.display = "block";
-  sgTagOrder = null;
-}
-
-function renderSgTagView() {
-  var el = document.getElementById("sgtag-content");
-  var o = sgTagOrder;
-  var html = '';
-  html += '<div style="font-weight:600;margin-bottom:4px;">單號 ' + sgEsc(o.marketplace_order_id || o.order_id || '') + '</div>';
-  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">勾選要印標籤的品項，數量欄是要印幾張，可自己改</div>';
-  (o.items || []).forEach(function (it, idx) {
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
-    html += '<input type="checkbox" id="sgtag-chk-' + idx + '" checked style="width:18px;height:18px;flex-shrink:0;" />';
-    html += '<div style="flex:1;font-size:14px;">' + sgEsc(it.name || '') + (it.variation ? '<span style="color:var(--text-muted);font-size:12px;">（' + sgEsc(it.variation) + '）</span>' : '') + '</div>';
-    html += '<input type="number" min="0" id="sgtag-qty-' + idx + '" value="' + sgEsc(String(it.qty || 1)) + '" style="width:60px;padding:4px;font-size:13px;" />';
-    html += '</div>';
-  });
-  html += '<button onclick="sgTagPrint()" style="width:100%;margin-top:16px;padding:12px;font-size:15px;background:var(--accent);color:#fff;border-color:var(--accent);">🏷️ 列印標籤</button>';
-  el.innerHTML = html;
-}
-
-function sgTagPrint() {
-  var o = sgTagOrder;
+// ========== 標籤列印（訂單卡片裡直接勾選品項，印B6標籤，一張切5個）==========
+function sgTagPrint(orderIdx) {
+  var o = siteGiantOrders[orderIdx];
   if (!o) return;
   var names = [];
-  (o.items || []).forEach(function (it, idx) {
-    var chk = document.getElementById('sgtag-chk-' + idx);
-    var qtyEl = document.getElementById('sgtag-qty-' + idx);
+  (o.items || []).forEach(function (it, itemIdx) {
+    var chk = document.getElementById('sg-tagchk-' + orderIdx + '-' + itemIdx);
+    var qtyEl = document.getElementById('sg-tagqty-' + orderIdx + '-' + itemIdx);
     if (!chk || !chk.checked) return;
     var qty = parseInt(qtyEl ? qtyEl.value : 0, 10);
     if (isNaN(qty) || qty <= 0) return;
     for (var i = 0; i < qty; i++) names.push(it.name || '');
   });
   if (!names.length) { alert('請至少勾選一項並確認數量大於 0'); return; }
+  sgPrintTagLabels(names);
+}
 
+// 共用的 B6 標籤列印排版（一張切5個），給「訂單卡片內勾選」和「Notion按鈕極簡模式」共用
+function sgPrintTagLabels(names) {
   var PER_SHEET = 5;
   var html = '';
   for (var s = 0; s < names.length; s += PER_SHEET) {
@@ -3138,6 +3125,10 @@ function sgOrderCardHtml(o, i) {
       html += '</div>';
       html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">';
       html += '<div style="font-size:15px;font-weight:700;white-space:nowrap;">x' + sgEsc(String(it.qty || '')) + '</div>';
+      html += '<label style="display:flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap;cursor:pointer;">';
+      html += '<input type="checkbox" id="sg-tagchk-' + i + '-' + itemIdx + '" /> 🏷️';
+      html += '<input type="number" min="1" id="sg-tagqty-' + i + '-' + itemIdx + '" value="' + sgEsc(String(it.qty || 1)) + '" style="width:42px;padding:1px 3px;font-size:11px;" />';
+      html += '</label>';
       if (getRole() === 'admin') {
         html += '<div style="display:flex;gap:4px;align-items:center;">';
         html += '<input type="number" min="1" id="sg-item-qty-' + i + '-' + itemIdx + '" value="' + sgEsc(String(it.qty || 1)) + '" style="width:50px;padding:2px 4px;font-size:12px;" />';
@@ -3161,6 +3152,7 @@ function sgOrderCardHtml(o, i) {
     html += '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
+    html += '<button onclick="sgTagPrint(' + i + ')" style="flex:1;padding:9px;font-size:14px;">🏷️ 列印標籤</button>';
     html += '</div>';
   html += '</div>';
   return html;

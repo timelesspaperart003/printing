@@ -1289,7 +1289,8 @@ function renderDetail(detail) {
     + '<textarea id="item-text" style="margin-top:5px;width:100%;min-height:120px;font-family:inherit;font-size:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;line-height:1.7;resize:vertical;outline:none;">' + esc(cleanedItemText) + '</textarea></div>'
     + '<div class="field"><div class="field-label">商品資訊</div>'
     + '<div class="view-toggle"><button id="btn-card" class="active" onclick="switchView(\'card\')">卡片版</button><button id="btn-list" onclick="switchView(\'list\')">列表版</button></div>'
-    + '<div id="product-area"><div class="status"><span class="spinner"></span>載入商品資訊...</div></div></div>'
+    + '<div id="product-area"><div class="status"><span class="spinner"></span>載入商品資訊...</div></div>'
+    + '<button type="button" onclick="taskTagPrint()" style="margin-top:8px;width:100%;padding:9px;font-size:14px;">🏷️ 列印標籤</button></div>'
     + contactFields
     + '<div class="divider"></div>'
     + '<div class="field"><div class="field-label">出貨人員</div>'
@@ -1930,6 +1931,30 @@ function switchView(view) {
   if (currentProducts && currentProducts.length > 0) renderProductArea(currentProducts);
 }
 
+// 商品資訊卡片/列表通用的標籤勾選控制項（勾選+數量），taskTagPrint() 會統一收集 .tagpick
+function tagPickHtml(name, qty) {
+  return '<label class="tagpick" data-tagname="' + esc(name) + '" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;margin-top:4px;cursor:pointer;">'
+    + '<input type="checkbox" class="tagpick-chk" /> 🏷️'
+    + '<input type="number" class="tagpick-qty" min="1" value="' + esc(String(qty || 1)) + '" style="width:42px;padding:1px 3px;font-size:11px;" onclick="event.stopPropagation();" />'
+    + '</label>';
+}
+
+// 掃描目前畫面上所有勾選的商品標籤，展開成陣列後用共用的 B6 標籤排版列印（sgPrintTagLabels 定義在 SiteGiant 區塊）
+function taskTagPrint() {
+  var names = [];
+  document.querySelectorAll('.tagpick').forEach(function(row) {
+    var chk = row.querySelector('.tagpick-chk');
+    var qtyEl = row.querySelector('.tagpick-qty');
+    if (!chk || !chk.checked) return;
+    var qty = parseInt(qtyEl ? qtyEl.value : 0, 10);
+    if (isNaN(qty) || qty <= 0) return;
+    var name = row.getAttribute('data-tagname') || '';
+    for (var i = 0; i < qty; i++) names.push(name);
+  });
+  if (!names.length) { alert('請至少勾選一項並確認數量大於 0'); return; }
+  sgPrintTagLabels(names);
+}
+
 function renderProductArea(products) {
   currentProducts = products;
   var area = document.getElementById("product-area");
@@ -1943,12 +1968,12 @@ function renderProductArea(products) {
       if (p.isNew) {
         html += '<div class="no-img">新商品</div>';
         html += '<div class="p-body"><div class="p-name">' + esc(p.name) + '</div>';
-        html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(p.qty) + '</div></div>';
+        html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(p.qty) + '</div>' + tagPickHtml(p.name, p.qty) + '</div>';
       } else {
         if (p.img) html += '<img src="' + p.img + '" alt="">';
         else html += '<div class="no-img">無圖</div>';
         html += '<div class="p-body"><div class="p-name">' + esc(p.name) + '</div>';
-        html += '<div class="p-meta">SKU：' + esc(p.sku || '-') + '<br>📍 ' + esc(p.loc || '-') + '<br>數量：' + esc(p.qty) + '</div></div>';
+        html += '<div class="p-meta">SKU：' + esc(p.sku || '-') + '<br>📍 ' + esc(p.loc || '-') + '<br>數量：' + esc(p.qty) + '</div>' + tagPickHtml(p.name, p.qty) + '</div>';
       }
       html += '</div>';
     });
@@ -1962,12 +1987,12 @@ function renderProductArea(products) {
         if (g.isNew) {
           html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品新</div>';
           html += '<div class="p-body"><div class="p-name">' + esc(g.name) + '</div>';
-          html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(g.qty) + '</div></div>';
+          html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(g.qty) + '</div>' + tagPickHtml(g.name, g.qty) + '</div>';
         } else {
           if (g.img) html += '<img src="' + g.img + '" alt="">';
           else html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品</div>';
           html += '<div class="p-body"><div class="p-name">' + esc(g.name) + '</div>';
-          html += '<div class="p-meta">SKU：' + esc(g.sku || '-') + '<br>📍 ' + esc(g.loc || '-') + '<br>數量：' + esc(g.qty) + '</div></div>';
+          html += '<div class="p-meta">SKU：' + esc(g.sku || '-') + '<br>📍 ' + esc(g.loc || '-') + '<br>數量：' + esc(g.qty) + '</div>' + tagPickHtml(g.name, g.qty) + '</div>';
         }
         html += '</div>';
       });
@@ -1986,12 +2011,12 @@ function renderProductArea(products) {
         if (r.isNew) {
           html += '<div class="no-img" style="background:#ffebee;color:#c00;font-size:10px;">退貨新</div>';
           html += '<div class="p-body"><div class="p-name">' + esc(r.name) + '</div>';
-          html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(r.qty) + '</div></div>';
+          html += '<div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(r.qty) + '</div>' + tagPickHtml(r.name, r.qty) + '</div>';
         } else {
           if (r.img) html += '<img src="' + r.img + '" alt="">';
           else html += '<div class="no-img" style="background:#ffebee;color:#c00;font-size:10px;">退貨</div>';
           html += '<div class="p-body"><div class="p-name">' + esc(r.name) + '</div>';
-          html += '<div class="p-meta">SKU：' + esc(r.sku || '-') + '<br>📍 ' + esc(r.loc || '-') + '<br>數量：' + esc(r.qty) + '</div></div>';
+          html += '<div class="p-meta">SKU：' + esc(r.sku || '-') + '<br>📍 ' + esc(r.loc || '-') + '<br>數量：' + esc(r.qty) + '</div>' + tagPickHtml(r.name, r.qty) + '</div>';
         }
         html += '</div>';
       });
@@ -2009,13 +2034,14 @@ function renderProductArea(products) {
       html += '<div class="product-list-item">';
       if (p.isNew) {
         html += '<div class="no-img">新商品</div>';
-        html += '<div class="p-info"><div class="p-name">' + esc(p.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(p.qty) + '</div></div>';
+        html += '<div class="p-info"><div class="p-name">' + esc(p.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(p.qty) + '</div>' + tagPickHtml(p.name, p.qty) + '</div>';
       } else {
         if (p.img) html += '<img src="' + p.img + '" alt="">';
         else html += '<div class="no-img">無圖</div>';
         html += '<div class="p-info">';
         html += '<div class="p-name">' + esc(p.name) + '</div>';
         html += '<div class="p-meta">SKU：' + esc(p.sku || '-') + '　📍 ' + esc(p.loc || '-') + '　數量：' + esc(p.qty) + '</div>';
+        html += tagPickHtml(p.name, p.qty);
         html += '</div>';
       }
       html += '</div>';
@@ -2028,13 +2054,14 @@ function renderProductArea(products) {
         html += '<div class="product-list-item">';
         if (g.isNew) {
           html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品新</div>';
-          html += '<div class="p-info"><div class="p-name">' + esc(g.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(g.qty) + '</div></div>';
+          html += '<div class="p-info"><div class="p-name">' + esc(g.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(g.qty) + '</div>' + tagPickHtml(g.name, g.qty) + '</div>';
         } else {
           if (g.img) html += '<img src="' + g.img + '" alt="">';
           else html += '<div class="no-img" style="background:#fff0f0;color:#c00;font-size:10px;">贈品</div>';
           html += '<div class="p-info">';
           html += '<div class="p-name">' + esc(g.name) + '</div>';
           html += '<div class="p-meta">SKU：' + esc(g.sku || '-') + '　📍 ' + esc(g.loc || '-') + '　數量：' + esc(g.qty) + '</div>';
+          html += tagPickHtml(g.name, g.qty);
           html += '</div>';
         }
         html += '</div>';
@@ -2052,13 +2079,14 @@ function renderProductArea(products) {
         html += '<div class="product-list-item">';
         if (r.isNew) {
           html += '<div class="no-img" style="background:#ffebee;color:#c00;font-size:10px;">退貨新</div>';
-          html += '<div class="p-info"><div class="p-name">' + esc(r.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(r.qty) + '</div></div>';
+          html += '<div class="p-info"><div class="p-name">' + esc(r.name) + '</div><div class="p-new">新商品，無資料</div><div class="p-meta">數量：' + esc(r.qty) + '</div>' + tagPickHtml(r.name, r.qty) + '</div>';
         } else {
           if (r.img) html += '<img src="' + r.img + '" alt="">';
           else html += '<div class="no-img" style="background:#ffebee;color:#c00;font-size:10px;">退貨</div>';
           html += '<div class="p-info">';
           html += '<div class="p-name">' + esc(r.name) + '</div>';
           html += '<div class="p-meta">SKU：' + esc(r.sku || '-') + '　📍 ' + esc(r.loc || '-') + '　數量：' + esc(r.qty) + '</div>';
+          html += tagPickHtml(r.name, r.qty);
           html += '</div>';
         }
         html += '</div>';

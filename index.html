@@ -299,15 +299,22 @@ function showQuickTagGate(name) {
   document.getElementById('login-gate').style.display = 'none';
   document.getElementById('app-main').style.display = 'none';
   document.getElementById('quicktag-gate').style.display = 'flex';
-  document.getElementById('quicktag-name').textContent = name;
+  var nameWrap = document.getElementById('quicktag-name');
+  if (name) {
+    nameWrap.textContent = name;
+  } else {
+    nameWrap.innerHTML = '<input type="text" id="quicktag-name-input" placeholder="輸入標籤名稱" style="width:100%;font-size:18px;text-align:center;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;" />';
+  }
   setTimeout(function() {
-    var q = document.getElementById('quicktag-qty');
-    if (q) { q.focus(); q.select(); }
+    var q = name ? document.getElementById('quicktag-qty') : document.getElementById('quicktag-name-input');
+    if (q) { q.focus(); if (q.select) q.select(); }
   }, 100);
 }
 
 function quickTagPrint() {
-  var name = document.getElementById('quicktag-name').textContent;
+  var nameInput = document.getElementById('quicktag-name-input');
+  var name = (nameInput ? nameInput.value : document.getElementById('quicktag-name').textContent).trim();
+  if (!name) { alert('請輸入標籤名稱'); if (nameInput) nameInput.focus(); return; }
   var qtyEl = document.getElementById('quicktag-qty');
   var qty = parseInt(qtyEl.value, 10);
   if (isNaN(qty) || qty <= 0) { alert('請輸入大於 0 的數量'); qtyEl.focus(); return; }
@@ -1083,13 +1090,13 @@ async function loadDetail(pageId) {
           if (currentTask._gifts) {
             currentTask._gifts = currentTask._gifts.map(function(g, i) {
               var gr = giftResults[i] || {};
-              return { name: g.name, qty: g.qty, sku: gr.sku||'', loc: gr.loc||'', isNew: gr.isNew||false, img: gr.img||'' };
+              return { name: g.name, qty: g.qty, sku: gr.sku||'', loc: gr.loc||'', isNew: gr.isNew||false, img: gr.img||'', tagName: gr.tagName||'' };
             });
           }
           if (currentTask._returns) {
             currentTask._returns = currentTask._returns.map(function(r, i) {
               var rr = returnResults[i] || {};
-              return { name: r.name, qty: r.qty, sku: rr.sku||'', loc: rr.loc||'', isNew: rr.isNew||false, img: rr.img||'' };
+              return { name: r.name, qty: r.qty, sku: rr.sku||'', loc: rr.loc||'', isNew: rr.isNew||false, img: rr.img||'', tagName: rr.tagName||'' };
             });
           }
           renderProductArea(regularResults);
@@ -1931,26 +1938,49 @@ function switchView(view) {
   if (currentProducts && currentProducts.length > 0) renderProductArea(currentProducts);
 }
 
-// 商品資訊卡片/列表通用的標籤勾選控制項（勾選+數量），taskTagPrint() 會統一收集 .tagpick
-function tagPickHtml(name, qty) {
-  return '<label class="tagpick" data-tagname="' + esc(name) + '" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;margin-top:4px;cursor:pointer;">'
-    + '<input type="checkbox" class="tagpick-chk" /> 🏷️'
-    + '<input type="number" class="tagpick-qty" min="1" value="' + esc(String(qty || 1)) + '" style="width:42px;padding:1px 3px;font-size:11px;" onclick="event.stopPropagation();" />'
-    + '</label>';
+// 商品資訊卡片/列表通用的標籤勾選控制項（勾選+數量）。標籤名稱固定用「產品表B欄」(上架名稱)，
+// 這欄查不到（tagName 空字串）時改顯示輸入框讓人員手動輸入。taskTagPrint()/sgTagPrint() 統一用 collectTagPicks() 收集 .tagpick
+function tagPickHtml(tagName, qty) {
+  tagName = (tagName || '').trim();
+  var html = '<span class="tagpick" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;margin-top:4px;flex-wrap:wrap;">';
+  html += '<label style="display:inline-flex;align-items:center;gap:2px;cursor:pointer;"><input type="checkbox" class="tagpick-chk" /> 🏷️</label>';
+  if (tagName) {
+    html += '<span class="tagpick-name" data-name="' + esc(tagName) + '" style="font-weight:600;">' + esc(tagName) + '</span>';
+  } else {
+    html += '<input type="text" class="tagpick-name-input" placeholder="輸入標籤名稱" style="width:110px;padding:1px 4px;font-size:11px;" onclick="event.stopPropagation();" />';
+  }
+  html += '<input type="number" class="tagpick-qty" min="1" value="' + esc(String(qty || 1)) + '" style="width:42px;padding:1px 3px;font-size:11px;" onclick="event.stopPropagation();" />';
+  html += '</span>';
+  return html;
 }
 
-// 掃描目前畫面上所有勾選的商品標籤，展開成陣列後用共用的 B6 標籤排版列印（sgPrintTagLabels 定義在 SiteGiant 區塊）
-function taskTagPrint() {
+// 掃描 root 底下所有勾選的 .tagpick，展開成陣列（勾了但沒填名稱會回傳 null 並跳提示，由呼叫端中止）
+function collectTagPicks(root) {
   var names = [];
-  document.querySelectorAll('.tagpick').forEach(function(row) {
+  var missing = 0;
+  root.querySelectorAll('.tagpick').forEach(function(row) {
     var chk = row.querySelector('.tagpick-chk');
-    var qtyEl = row.querySelector('.tagpick-qty');
     if (!chk || !chk.checked) return;
+    var nameEl = row.querySelector('.tagpick-name');
+    var name = nameEl ? (nameEl.getAttribute('data-name') || '') : '';
+    if (!name) {
+      var inputEl = row.querySelector('.tagpick-name-input');
+      name = inputEl ? inputEl.value.trim() : '';
+    }
+    if (!name) { missing++; return; }
+    var qtyEl = row.querySelector('.tagpick-qty');
     var qty = parseInt(qtyEl ? qtyEl.value : 0, 10);
     if (isNaN(qty) || qty <= 0) return;
-    var name = row.getAttribute('data-tagname') || '';
     for (var i = 0; i < qty; i++) names.push(name);
   });
+  if (missing > 0) { alert('有 ' + missing + ' 項勾選但尚未輸入標籤名稱，請填寫後再列印'); return null; }
+  return names;
+}
+
+// 掃描整頁勾選的商品標籤，展開成陣列後用共用的 B6 標籤排版列印（sgPrintTagLabels 定義在 SiteGiant 區塊）
+function taskTagPrint() {
+  var names = collectTagPicks(document);
+  if (names === null) return;
   if (!names.length) { alert('請至少勾選一項並確認數量大於 0'); return; }
   sgPrintTagLabels(names);
 }
@@ -2752,17 +2782,10 @@ function backFromSiteGiant() {
 
 // ========== 標籤列印（訂單卡片裡直接勾選品項，印B6標籤，一張切5個）==========
 function sgTagPrint(orderIdx) {
-  var o = siteGiantOrders[orderIdx];
-  if (!o) return;
-  var names = [];
-  (o.items || []).forEach(function (it, itemIdx) {
-    var chk = document.getElementById('sg-tagchk-' + orderIdx + '-' + itemIdx);
-    var qtyEl = document.getElementById('sg-tagqty-' + orderIdx + '-' + itemIdx);
-    if (!chk || !chk.checked) return;
-    var qty = parseInt(qtyEl ? qtyEl.value : 0, 10);
-    if (isNaN(qty) || qty <= 0) return;
-    for (var i = 0; i < qty; i++) names.push(it.name || '');
-  });
+  var card = document.getElementById('sg-card-' + orderIdx);
+  if (!card) return;
+  var names = collectTagPicks(card);
+  if (names === null) return;
   if (!names.length) { alert('請至少勾選一項並確認數量大於 0'); return; }
   sgPrintTagLabels(names);
 }
@@ -3153,10 +3176,7 @@ function sgOrderCardHtml(o, i) {
       html += '</div>';
       html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">';
       html += '<div style="font-size:15px;font-weight:700;white-space:nowrap;">x' + sgEsc(String(it.qty || '')) + '</div>';
-      html += '<label style="display:flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap;cursor:pointer;">';
-      html += '<input type="checkbox" id="sg-tagchk-' + i + '-' + itemIdx + '" /> 🏷️';
-      html += '<input type="number" min="1" id="sg-tagqty-' + i + '-' + itemIdx + '" value="' + sgEsc(String(it.qty || 1)) + '" style="width:42px;padding:1px 3px;font-size:11px;" />';
-      html += '</label>';
+      html += tagPickHtml(it.tagName, it.qty);
       if (getRole() === 'admin') {
         html += '<div style="display:flex;gap:4px;align-items:center;">';
         html += '<input type="number" min="1" id="sg-item-qty-' + i + '-' + itemIdx + '" value="' + sgEsc(String(it.qty || 1)) + '" style="width:50px;padding:2px 4px;font-size:12px;" />';

@@ -2750,7 +2750,28 @@ document.getElementById("search-input").addEventListener("keydown", function(e) 
 // ========= SiteGiant 待出貨（Stage 2，獨立區塊，不動既有功能）=========
 // ==================================================================
 var siteGiantOrders = [];
+var sgSyncStatus = null;
 var sgHidePacked = localStorage.getItem('sg_hide_packed') === '1';
+
+// 顯示「上次同步：X分鐘前」，同步排程卡住時（Cloudflare cron 沒跑）一眼就看得出來，
+// 不用等使用者發現訂單少了才知道。>15分鐘算慢（正常10分鐘一次）、>40分鐘標紅示警。
+function sgSyncStatusHtml() {
+  var st = sgSyncStatus;
+  if (!st || !st.lastSyncAt) {
+    return '<div style="font-size:12px;padding:6px 10px;border-radius:6px;margin-bottom:8px;background:#eee;color:#666;">❔ 同步狀態未知</div>';
+  }
+  var d = new Date(String(st.lastSyncAt).replace(' ', 'T'));
+  var mins = isNaN(d.getTime()) ? null : Math.round((Date.now() - d.getTime()) / 60000);
+  var style = 'background:#e8f5e9;color:#1b6e2a;', label = '✅', warn = '';
+  if (mins === null) { style = 'background:#eee;color:#666;'; label = '❔'; }
+  else if (mins > 40) { style = 'background:#ffe2dd;color:#b8342e;'; label = '🔴'; warn = ' — 同步可能已中斷，請通知系統管理員'; }
+  else if (mins > 15) { style = 'background:#fdecc8;color:#a66a00;'; label = '⚠️'; warn = '（比平常慢，正常應每10分鐘一次）'; }
+  var text = mins === null ? '時間格式異常' : (mins <= 0 ? '不到 1 分鐘前' : mins + ' 分鐘前');
+  return '<div style="font-size:12px;padding:6px 10px;border-radius:6px;margin-bottom:8px;' + style + '">'
+    + label + ' 上次同步：' + text
+    + (st.totalPending !== undefined && st.totalPending !== '' ? '（SiteGiant 端目前待出貨 ' + sgEsc(String(st.totalPending)) + ' 筆）' : '')
+    + warn + '</div>';
+}
 function sgToggleHidePacked() {
   sgHidePacked = !sgHidePacked;
   localStorage.setItem('sg_hide_packed', sgHidePacked ? '1' : '0');
@@ -2771,6 +2792,7 @@ async function loadSiteGiant() {
     var data = await gasAPI({ action: "siteGiantList" });
     if (data.error) throw new Error(data.error);
     siteGiantOrders = data.orders || [];
+    sgSyncStatus = data.syncStatus || null;
     renderSiteGiantList();
   } catch (e) {
     el.innerHTML = '<div class="status error">載入失敗：' + sgEsc(e.message) + '</div>'
@@ -3083,6 +3105,7 @@ function renderSiteGiantList() {
   var el = document.getElementById("sitegiant-content");
   if (!siteGiantOrders.length) {
     el.innerHTML = '<div style="font-weight:600;margin-bottom:6px;">SiteGiant 待出貨</div>'
+      + sgSyncStatusHtml()
       + '<div class="status">目前沒有待出貨訂單</div>'
       + '<button onclick="loadSiteGiant()" style="margin-top:10px;width:100%;">🔄 重新整理</button>';
     return;
@@ -3099,6 +3122,7 @@ function renderSiteGiantList() {
   html += '<button onclick="loadSiteGiant()" style="padding:6px 12px;font-size:13px;">🔄 重新整理</button>';
   html += '</div>';
   html += '</div>';
+  html += sgSyncStatusHtml();
   html += '<input type="text" id="sg-search" oninput="sgFilter()" placeholder="搜尋 單號 / 收件人 / 商品..." style="margin-bottom:8px;" />';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
   html += '<select id="sg-filter-status" onchange="sgFilter()" style="flex:1;">';

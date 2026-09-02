@@ -2849,10 +2849,10 @@ function sgPrintTagLabels(names) {
   var css = [
     "*{box-sizing:border-box;margin:0;padding:0;}",
     "body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;}",
-    "@page{size:128mm 182mm;margin:0;}",
-    ".sgtag-sheet{width:128mm;height:182mm;display:flex;flex-direction:column;page-break-after:always;}",
+    "@page{size:100mm 150mm;margin:0;}",
+    ".sgtag-sheet{width:100mm;height:150mm;display:flex;flex-direction:column;page-break-after:always;}",
     ".sgtag-sheet:last-child{page-break-after:auto;}",
-    ".sgtag-cell{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;font-size:" + fontSize + "pt;font-weight:700;border-bottom:1px dashed #999;padding:4mm;word-break:break-all;}",
+    ".sgtag-cell{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;font-size:" + fontSize + "pt;font-weight:700;border-bottom:1px solid #000;padding:3mm;word-break:break-all;}",
     ".sgtag-cell:last-child{border-bottom:none;}"
   ].join("");
   sgOpenPrint('標籤列印', css, html);

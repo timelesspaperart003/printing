@@ -114,8 +114,10 @@
     <div style="font-size:12px;color:#999;margin-bottom:8px;">🏷️ 列印標籤</div>
     <div id="quicktag-name" style="font-size:20px;font-weight:700;margin-bottom:20px;word-break:break-all;"></div>
     <input type="number" id="quicktag-qty" min="1" value="1" style="width:100%;font-size:24px;text-align:center;padding:12px;border:1px solid var(--border,#ccc);border-radius:8px;margin-bottom:16px;" />
-    <button onclick="quickTagPrint()" style="width:100%;padding:14px;font-size:16px;background:#1a1814;color:#fff;border:none;border-radius:8px;cursor:pointer;">🏷️ 列印標籤</button>
+    <button onclick="quickTagPrint()" style="width:100%;padding:14px;font-size:16px;background:#1a1814;color:#fff;border:none;border-radius:8px;cursor:pointer;">🏷️ 立即列印</button>
+    <button onclick="addToTagQueueFromGate()" style="width:100%;padding:10px;font-size:14px;margin-top:8px;background:#fff;color:#1a1814;border:1px solid #1a1814;border-radius:8px;cursor:pointer;">➕ 加入待印清單（湊滿再一起印，省紙）</button>
     <div id="quicktag-font-slider" style="margin-top:14px;text-align:left;"></div>
+    <div id="quicktag-queue-box" style="margin-top:16px;text-align:left;font-size:12px;border-top:1px dashed #ddd;padding-top:12px;"></div>
   </div>
 </div>
 <!-- 密碼閘：未登入時顯示，登入後 JS 隱藏 -->
@@ -307,6 +309,7 @@ function showQuickTagGate(name) {
     nameWrap.innerHTML = '<input type="text" id="quicktag-name-input" placeholder="輸入標籤名稱" style="width:100%;font-size:18px;text-align:center;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;" />';
   }
   document.getElementById('quicktag-font-slider').innerHTML = tagFontSliderHtml('quick');
+  renderTagQueueBox('quicktag-queue-box');
   setTimeout(function() {
     var q = name ? document.getElementById('quicktag-qty') : document.getElementById('quicktag-name-input');
     if (q) { q.focus(); if (q.select) q.select(); }
@@ -323,6 +326,80 @@ function quickTagPrint() {
   var names = [];
   for (var i = 0; i < qty; i++) names.push(name);
   sgPrintTagLabels(names);
+}
+
+// ===== 標籤待印清單：存 localStorage，同一台裝置/瀏覽器上不管從哪個 Notion 任務點進來都共用，
+// 湊到一定數量再一起印，一張紙印滿5格，不會每次只印1、2個就浪費剩下的空格 =====
+function getTagQueue() {
+  try { return JSON.parse(localStorage.getItem('tagLabelQueue') || '[]'); } catch (e) { return []; }
+}
+function setTagQueue(arr) {
+  localStorage.setItem('tagLabelQueue', JSON.stringify(arr));
+}
+function addToTagQueue(name, qty) {
+  name = (name || '').trim();
+  qty = parseInt(qty, 10);
+  if (!name || isNaN(qty) || qty <= 0) return;
+  var queue = getTagQueue();
+  var existing = null;
+  for (var i = 0; i < queue.length; i++) { if (queue[i].name === name) { existing = queue[i]; break; } }
+  if (existing) existing.qty += qty;
+  else queue.push({ name: name, qty: qty });
+  setTagQueue(queue);
+}
+function tagQueueTotalCount() {
+  return getTagQueue().reduce(function(s, q) { return s + q.qty; }, 0);
+}
+function renderTagQueueBox(containerId) {
+  var box = document.getElementById(containerId);
+  if (!box) return;
+  var queue = getTagQueue();
+  if (!queue.length) { box.innerHTML = '<div style="color:#999;">待印清單目前是空的</div>'; return; }
+  var total = tagQueueTotalCount();
+  var html = '<div style="font-weight:600;margin-bottom:4px;">待印清單（共 ' + total + ' 張）</div>';
+  html += '<div style="max-height:120px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:6px;margin-bottom:8px;">';
+  queue.forEach(function(q, i) {
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;">'
+      + '<span>' + sgEsc(q.name) + ' x' + q.qty + '</span>'
+      + '<button type="button" onclick="removeFromTagQueue(' + i + ')" style="border:none;background:none;color:#c00;cursor:pointer;font-size:14px;">✕</button>'
+      + '</div>';
+  });
+  html += '</div>';
+  html += '<div style="display:flex;gap:6px;">';
+  html += '<button type="button" onclick="printTagQueue()" style="flex:1;padding:8px;font-size:13px;background:#1a1814;color:#fff;border:none;border-radius:6px;cursor:pointer;">🖨 一起列印（' + total + '張）</button>';
+  html += '<button type="button" onclick="clearTagQueue()" style="padding:8px 10px;font-size:13px;background:#fff;border:1px solid #ccc;border-radius:6px;cursor:pointer;">清空</button>';
+  html += '</div>';
+  box.innerHTML = html;
+}
+function removeFromTagQueue(idx) {
+  var queue = getTagQueue();
+  queue.splice(idx, 1);
+  setTagQueue(queue);
+  renderTagQueueBox('quicktag-queue-box');
+}
+function clearTagQueue() {
+  if (!confirm('確定要清空待印清單嗎？')) return;
+  setTagQueue([]);
+  renderTagQueueBox('quicktag-queue-box');
+}
+function printTagQueue() {
+  var queue = getTagQueue();
+  if (!queue.length) { alert('待印清單是空的'); return; }
+  var names = [];
+  queue.forEach(function(q) { for (var i = 0; i < q.qty; i++) names.push(q.name); });
+  sgPrintTagLabels(names);
+  setTagQueue([]);
+  renderTagQueueBox('quicktag-queue-box');
+}
+function addToTagQueueFromGate() {
+  var nameInput = document.getElementById('quicktag-name-input');
+  var name = (nameInput ? nameInput.value : document.getElementById('quicktag-name').textContent).trim();
+  if (!name) { alert('請輸入標籤名稱'); if (nameInput) nameInput.focus(); return; }
+  var qtyEl = document.getElementById('quicktag-qty');
+  var qty = parseInt(qtyEl.value, 10);
+  if (isNaN(qty) || qty <= 0) { alert('請輸入大於 0 的數量'); qtyEl.focus(); return; }
+  addToTagQueue(name, qty);
+  renderTagQueueBox('quicktag-queue-box');
 }
 
 // Enter 鍵觸發登入

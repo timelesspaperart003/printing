@@ -167,7 +167,10 @@
       <h1>出貨單列印工具</h1>
       <p id="today-date"></p>
     </div>
-    <button onclick="doLogout()" style="padding:6px 12px;font-size:13px;white-space:nowrap;">登出</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="showTagQueueModal()" style="padding:6px 12px;font-size:13px;white-space:nowrap;">🏷️ 待印清單</button>
+      <button onclick="doLogout()" style="padding:6px 12px;font-size:13px;white-space:nowrap;">登出</button>
+    </div>
   </div>
   <div id="view-search">
     <div class="card">
@@ -347,10 +350,19 @@ function addToTagQueue(name, qty) {
   else queue.push({ name: name, qty: qty });
   setTagQueue(queue);
 }
+function addNamesToTagQueue(names) {
+  var counts = {};
+  names.forEach(function(n) { counts[n] = (counts[n] || 0) + 1; });
+  Object.keys(counts).forEach(function(n) { addToTagQueue(n, counts[n]); });
+}
 function tagQueueTotalCount() {
   return getTagQueue().reduce(function(s, q) { return s + q.qty; }, 0);
 }
+// 記住最後一次是在哪個容器（Notion快印畫面本身 / 主系統彈出的待印清單視窗）畫出清單，
+// 這樣清單裡按刪除/列印/清空之後，才知道要重新畫回哪一個容器
+var _tagQueueActiveContainer = 'quicktag-queue-box';
 function renderTagQueueBox(containerId) {
+  _tagQueueActiveContainer = containerId;
   var box = document.getElementById(containerId);
   if (!box) return;
   var queue = getTagQueue();
@@ -375,12 +387,12 @@ function removeFromTagQueue(idx) {
   var queue = getTagQueue();
   queue.splice(idx, 1);
   setTagQueue(queue);
-  renderTagQueueBox('quicktag-queue-box');
+  renderTagQueueBox(_tagQueueActiveContainer);
 }
 function clearTagQueue() {
   if (!confirm('確定要清空待印清單嗎？')) return;
   setTagQueue([]);
-  renderTagQueueBox('quicktag-queue-box');
+  renderTagQueueBox(_tagQueueActiveContainer);
 }
 function printTagQueue() {
   var queue = getTagQueue();
@@ -389,7 +401,7 @@ function printTagQueue() {
   queue.forEach(function(q) { for (var i = 0; i < q.qty; i++) names.push(q.name); });
   sgPrintTagLabels(names);
   setTagQueue([]);
-  renderTagQueueBox('quicktag-queue-box');
+  renderTagQueueBox(_tagQueueActiveContainer);
 }
 function addToTagQueueFromGate() {
   var nameInput = document.getElementById('quicktag-name-input');
@@ -400,6 +412,26 @@ function addToTagQueueFromGate() {
   if (isNaN(qty) || qty <= 0) { alert('請輸入大於 0 的數量'); qtyEl.focus(); return; }
   addToTagQueue(name, qty);
   renderTagQueueBox('quicktag-queue-box');
+}
+
+// 主系統(SiteGiant訂單卡片/出貨單列印任務頁)裡按右上角「🏷️ 待印清單」彈出的小視窗，
+// 跟 Notion 快印畫面共用同一份 localStorage 清單，方便從三個入口累積後統一列印
+function showTagQueueModal() {
+  closeTagQueueModal();
+  var overlay = document.createElement('div');
+  overlay.id = 'tag-queue-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem;';
+  overlay.onclick = function(e) { if (e.target === overlay) closeTagQueueModal(); };
+  overlay.innerHTML = '<div style="max-width:360px;width:100%;background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 10px 40px -10px rgba(0,0,0,0.2);">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:700;">🏷️ 標籤待印清單</div><button type="button" onclick="closeTagQueueModal()" style="border:none;background:none;font-size:18px;cursor:pointer;">✕</button></div>'
+    + '<div id="tag-queue-modal-box" style="font-size:13px;"></div>'
+    + '</div>';
+  document.body.appendChild(overlay);
+  renderTagQueueBox('tag-queue-modal-box');
+}
+function closeTagQueueModal() {
+  var overlay = document.getElementById('tag-queue-modal-overlay');
+  if (overlay) overlay.remove();
 }
 
 // Enter 鍵觸發登入
@@ -1376,7 +1408,10 @@ function renderDetail(detail) {
     + '<div class="field"><div class="field-label">商品資訊</div>'
     + '<div class="view-toggle"><button id="btn-card" class="active" onclick="switchView(\'card\')">卡片版</button><button id="btn-list" onclick="switchView(\'list\')">列表版</button></div>'
     + '<div id="product-area"><div class="status"><span class="spinner"></span>載入商品資訊...</div></div>'
-    + '<button type="button" onclick="taskTagPrint()" style="margin-top:8px;width:100%;padding:9px;font-size:14px;">🏷️ 列印標籤</button>'
+    + '<div style="display:flex;gap:6px;margin-top:8px;">'
+    + '<button type="button" onclick="taskTagPrint()" style="flex:1;padding:9px;font-size:14px;">🏷️ 列印標籤</button>'
+    + '<button type="button" onclick="taskTagAddQueue()" style="flex:1;padding:9px;font-size:14px;">➕ 加入待印清單</button>'
+    + '</div>'
     + tagFontSliderHtml('task') + '</div>'
     + contactFields
     + '<div class="divider"></div>'
@@ -2063,6 +2098,15 @@ function taskTagPrint() {
   if (names === null) return;
   if (!names.length) { alert('請至少勾選一項並確認數量大於 0'); return; }
   sgPrintTagLabels(names);
+}
+
+// 不馬上印，先加進共用的待印清單（addNamesToTagQueue 定義在 SiteGiant 區塊），湊多個再一起印比較省紙
+function taskTagAddQueue() {
+  var names = collectTagPicks(document);
+  if (names === null) return;
+  if (!names.length) { alert('請至少勾選一項並確認數量大於 0'); return; }
+  addNamesToTagQueue(names);
+  alert('已加入待印清單（' + names.length + ' 張）');
 }
 
 function renderProductArea(products) {
@@ -2892,6 +2936,17 @@ function sgTagPrint(orderIdx) {
   sgPrintTagLabels(names);
 }
 
+// 不馬上印，先加進共用的待印清單，湊多個再一起印比較省紙
+function sgTagAddQueue(orderIdx) {
+  var card = document.getElementById('sg-card-' + orderIdx);
+  if (!card) return;
+  var names = collectTagPicks(card);
+  if (names === null) return;
+  if (!names.length) { alert('請至少勾選一項並確認數量大於 0'); return; }
+  addNamesToTagQueue(names);
+  alert('已加入待印清單（' + names.length + ' 張）');
+}
+
 // 共用的 B6 標籤列印排版（一張切5個），給「訂單卡片內勾選」和「Notion按鈕極簡模式」共用
 // 標籤字體大小滑動桿：存 localStorage，三個列印入口(SiteGiant卡片/出貨單列印任務頁/Notion快印)共用同一個設定
 function getTagFontSize() {
@@ -3324,6 +3379,7 @@ function sgOrderCardHtml(o, i) {
     html += '<div style="display:flex;gap:8px;margin-top:10px;">';
     html += '<button onclick="printSiteGiantOrder(' + i + ')" style="flex:1;padding:9px;font-size:14px;background:var(--accent);color:#fff;border-color:var(--accent);">🖨️ 出貨單</button>';
     html += '<button onclick="sgTagPrint(' + i + ')" style="flex:1;padding:9px;font-size:14px;">🏷️ 列印標籤</button>';
+    html += '<button onclick="sgTagAddQueue(' + i + ')" style="flex:1;padding:9px;font-size:14px;">➕ 加入待印清單</button>';
     html += '</div>';
     html += tagFontSliderHtml('sg-' + i);
   html += '</div>';

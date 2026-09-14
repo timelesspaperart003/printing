@@ -448,13 +448,26 @@ var DEFAULT_POST_IDX = 0;      // 預設寄件郵局的 index
 var SELECTED_POST_IDX = 0;     // 目前選中的寄件郵局 index
 
 // gasAPI：自動帶上 api_key
-async function gasAPI(params) {
+async function gasAPI(params, _retryCount) {
   var withKey = Object.assign({}, params, { key: getApiKey() });
   var url = GAS_URL + "?" + Object.keys(withKey).map(function(k) {
     return encodeURIComponent(k) + "=" + encodeURIComponent(withKey[k]);
   }).join("&");
   var res = await fetch(url, { cache: "no-store" });
-  var data = await res.json();
+  var text = await res.text();
+  var data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    // GAS /exec 的轉址偶爾會卡到失效的舊網址、回傳 Google 的 HTML 錯誤頁而非 JSON（跟本地程式碼無關）。
+    // 每次都是全新的一次 fetch（等於換一次轉址），自動重試 2 次再放棄，不用每次都靠使用者手動整頁重新整理。
+    var retryCount = _retryCount || 0;
+    if (retryCount < 2) {
+      await new Promise(function(r) { setTimeout(r, 500 * (retryCount + 1)); });
+      return gasAPI(params, retryCount + 1);
+    }
+    throw new Error('伺服器回應異常（非 JSON），請稍後再試或重新整理頁面');
+  }
   // 若後端回 Unauthorized，代表 key 過期或被重設，清除並回登入
   if (data && data.error === 'Unauthorized') {
     clearApiKey();
@@ -1353,8 +1366,10 @@ function renderDetail(detail) {
   var customers = detail.customers || [];
   var sheetName = customers.length > 0 ? customers[0].name : "";
   var sheetPhone = customers.length > 0 ? customers[0].phone : "";
-  var finalName = detail.nameFromDesc || sheetName;
-  var finalPhone = detail.phoneFromDesc || sheetPhone;
+  // <代寄>：總卡客戶其實是寄件人，收件人只能認說明裡打的，不可退回總卡客戶資料
+  var isDaiji = !!detail.isDaiji;
+  var finalName = isDaiji ? (detail.nameFromDesc || "") : (detail.nameFromDesc || sheetName);
+  var finalPhone = isDaiji ? (detail.phoneFromDesc || "") : (detail.phoneFromDesc || sheetPhone);
   var cleanedItemText = cleanItemText(detail.itemText);
 
   var addrOptions = "";
@@ -1364,7 +1379,7 @@ function renderDetail(detail) {
   });
   if (!addrOptions) addrOptions = '<option value="">（無地址資料）</option>';
 
-  currentTask = { title: detail.title, date: detail.date, itemText: cleanedItemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup };
+  currentTask = { title: detail.title, date: detail.date, itemText: cleanedItemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup, isDaiji: isDaiji };
   currentAddresses = customers;
 
   // 寄件郵局下拉
@@ -2615,7 +2630,14 @@ function doPrint() {
   var recvAddr2 = addrText;
   var recvZip2 = lookupZip3(recvAddr2) || "";
   var recvAddrClean2 = recvAddr2.replace(/^\d{3,6}/, "").trim();
-  var senderZip2 = "717";
+
+  // <代寄>：寄件人改印總卡客戶資料（找不到總卡客戶時退回公司資料，避免印出空白寄件人）
+  var isDaiji = !!(currentTask && currentTask.isDaiji);
+  var daijiSender = (isDaiji && currentAddresses.length > 0) ? currentAddresses[0] : null;
+  var senderName2 = daijiSender ? daijiSender.name : "雋永紙藝";
+  var senderPhone2 = daijiSender ? daijiSender.phone : "0961-561-234 / 062-052-140";
+  var senderAddr2 = daijiSender ? daijiSender.address : "台南市仁德區太子五街22巷1號";
+  var senderZip2 = daijiSender ? (lookupZip3(senderAddr2) || "") : "717";
 
   function zipBoxes2(zip, count) {
     var boxes = "";
@@ -2673,10 +2695,10 @@ function doPrint() {
         // 寄件人
         + "        <div class='cod-sec'>"
         + "          <div class='cod-row-2'>"
-        + "            <span>寄件人姓名：<b>雋永紙藝</b></span>"
-        + "            <span>電話：<b>0961-561-234 / 062-052-140</b></span>"
+        + "            <span>寄件人姓名：<b>" + esc(senderName2) + "</b></span>"
+        + "            <span>電話：<b>" + esc(senderPhone2) + "</b></span>"
         + "          </div>"
-        + "          <div class='cod-row'>詳細地址：<b>台南市仁德區太子五街22巷1號</b></div>"
+        + "          <div class='cod-row'>詳細地址：<b>" + esc(senderAddr2) + "</b></div>"
         +            depositFields
         + "        </div>"
         // 收件人（國內郵資已付在收件人右側，僅第一聯）
@@ -2784,9 +2806,9 @@ function doPrint() {
       + "<div>"
       + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;'><span style='color:#c00;font-weight:700;'>（寄件人）</span>"
       + "<table class='zip-table' style='margin-left:3mm;'><tr>" + zipBoxes2(senderZip2,3) + "<td class='zip-sep'>-</td>" + zipBoxes2("",2) + "</tr></table></div>"
-      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>地址：<span class='post-line' style='flex:1;'>台南市仁德區太子五街22巷1號</span></div>"
-      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>姓名：<span class='post-line' style='min-width:40mm;'>雋永紙藝</span>"
-      + "<span style='margin-left:5mm;'>電話：</span><span class='post-line' style='flex:1;'>0961-561-234 / 062-052-140</span></div>"
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>地址：<span class='post-line' style='flex:1;'>" + esc(senderAddr2) + "</span></div>"
+      + "<div class='post-row' style='font-size:" + Math.round(p2s*0.85) + "pt;margin-top:1mm;'>姓名：<span class='post-line' style='min-width:40mm;'>" + esc(senderName2) + "</span>"
+      + "<span style='margin-left:5mm;'>電話：</span><span class='post-line' style='flex:1;'>" + esc(senderPhone2) + "</span></div>"
       + "</div>"
       + "<div class='post-divider'></div>"
       + "<div style='flex:1;display:flex;flex-direction:column;justify-content:center;'>"

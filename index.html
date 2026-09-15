@@ -193,6 +193,11 @@
       <button class="primary" onclick="loadSiteGiant()">SiteGiant 待出貨清單</button>
       <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">蝦皮等通路 · 待處理(Paid) · 每 10 分鐘自動同步</div>
     </div>
+    <div class="card" id="packstats-entry" style="display:none;margin-top:0.75rem;">
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--text);">📊 主管統計</div>
+      <button class="primary" onclick="loadPackStats()">包貨統計</button>
+      <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">每月各包貨人筆數、訂單與商品明細（僅 2026/09/15 起累積的資料）</div>
+    </div>
     <div id="tasks-list"></div>
   </div>
   <div id="view-detail" style="display:none;">
@@ -210,6 +215,12 @@
   <div id="view-sitegiant" style="display:none;">
     <button class="ghost" onclick="backFromSiteGiant()">← 返回搜尋</button>
     <div class="card" id="sitegiant-content">
+      <div class="status"><span class="spinner"></span>載入中...</div>
+    </div>
+  </div>
+  <div id="view-packstats" style="display:none;">
+    <button class="ghost" onclick="backFromPackStats()">← 返回搜尋</button>
+    <div class="card" id="packstats-content">
       <div class="status"><span class="spinner"></span>載入中...</div>
     </div>
   </div>
@@ -273,6 +284,8 @@ async function doLogin() {
 function showApp() {
   document.getElementById('login-gate').style.display = 'none';
   document.getElementById('app-main').style.display = 'block';
+  var packStatsEntry = document.getElementById('packstats-entry');
+  if (packStatsEntry) packStatsEntry.style.display = (getRole() === 'admin') ? 'block' : 'none';
   preloadShippingData();
 }
 
@@ -1379,7 +1392,7 @@ function renderDetail(detail) {
   });
   if (!addrOptions) addrOptions = '<option value="">（無地址資料）</option>';
 
-  currentTask = { title: detail.title, date: detail.date, itemText: cleanedItemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup, isDaiji: isDaiji };
+  currentTask = { title: detail.title, date: detail.date, itemText: cleanedItemText, isPickup: isPickup, isNanbanPickup: isNanbanPickup, isDaiji: isDaiji, contactNotionName: detail.contactNotionName || "" };
   currentAddresses = customers;
 
   // 寄件郵局下拉
@@ -2395,6 +2408,18 @@ function doPrint() {
   staffBoxes.forEach(function(b){ staffChecked.push(b.value); });
   var staffText = staffChecked.length > 0 ? staffChecked.join('、') : '';
 
+  // 主管統計用：列印出貨單當下記一筆包貨記錄（每位勾選的出貨人員各記一筆）。
+  // 沒有勾人就不記；同一張單重複列印會各記一筆，統計頁需自行去重
+  if (staffChecked.length > 0) {
+    gasAPI({
+      action: 'logTaskPack',
+      staff_names: staffChecked.join(','),
+      title: fieldTitle,
+      customer: (currentTask && currentTask.contactNotionName) || '',
+      items_summary: itemTextVal
+    }).catch(function(e) { console.warn('記錄包貨失敗', e); });
+  }
+
   // ======= 代收貨款判斷 =======
   var paymentText = currentTask._payment || '';
   var pinfo = classifyPayment(paymentText);
@@ -2948,6 +2973,108 @@ function backFromSiteGiant() {
   document.getElementById("view-search").style.display = "block";
 }
 
+// ========== 主管統計：包貨記錄依月份/包貨人分組（僅 admin 看得到入口）==========
+var packStatsRecords = [];
+var packStatsSelectedMonth = null;
+
+async function loadPackStats() {
+  document.getElementById("view-search").style.display = "none";
+  document.getElementById("view-packstats").style.display = "block";
+  var el = document.getElementById("packstats-content");
+  el.innerHTML = '<div class="status"><span class="spinner"></span>載入中...</div>';
+  try {
+    var data = await gasAPI({ action: "getPackStats", role: getRole() });
+    if (!data || data.ok === false) throw new Error((data && data.error) || "載入失敗");
+    packStatsRecords = data.records || [];
+    renderPackStats();
+  } catch (e) {
+    el.innerHTML = '<div class="status error">載入失敗：' + esc(e.message) + '</div>'
+      + '<button onclick="loadPackStats()" style="margin-top:10px;width:100%;">🔄 再試一次</button>';
+  }
+}
+
+function backFromPackStats() {
+  document.getElementById("view-packstats").style.display = "none";
+  document.getElementById("view-search").style.display = "block";
+}
+
+function packStatsMonthKey(timeStr) {
+  return (timeStr || "").substring(0, 7); // "yyyy-MM-dd HH:mm:ss" → "yyyy-MM"
+}
+
+function onPackStatsMonthChange(m) {
+  packStatsSelectedMonth = m;
+  renderPackStats();
+}
+
+function packStatsToggle(id) {
+  var box = document.getElementById(id);
+  if (!box) return;
+  box.style.display = (box.style.display === "none") ? "block" : "none";
+}
+
+function renderPackStats() {
+  var el = document.getElementById("packstats-content");
+  var months = {};
+  packStatsRecords.forEach(function(r) {
+    var m = packStatsMonthKey(r.time);
+    if (m) months[m] = true;
+  });
+  var monthList = Object.keys(months).sort().reverse();
+  if (!packStatsSelectedMonth || monthList.indexOf(packStatsSelectedMonth) < 0) {
+    packStatsSelectedMonth = monthList[0] || "";
+  }
+
+  var html = '<div style="font-size:16px;font-weight:600;margin-bottom:10px;">📊 包貨統計</div>';
+  if (!monthList.length) {
+    html += '<div class="status">目前還沒有任何包貨記錄（從 2026/09/15 起累積，需要實際勾選已包貨或列印出貨單才會產生資料）</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  html += '<select id="packstats-month-select" onchange="onPackStatsMonthChange(this.value)" style="margin-bottom:12px;width:100%;padding:8px;font-size:14px;">';
+  monthList.forEach(function(m) {
+    html += '<option value="' + m + '"' + (m === packStatsSelectedMonth ? " selected" : "") + '>' + m + '</option>';
+  });
+  html += '</select>';
+
+  // 同一張單(訂單類型+訂單編號)在這個月內去重只留最後一筆，避免重複列印/重複勾選讓筆數灌水
+  var monthRecords = packStatsRecords.filter(function(r) { return packStatsMonthKey(r.time) === packStatsSelectedMonth; });
+  var byPacker = {};
+  monthRecords.forEach(function(r) {
+    var packer = r.packer || "（未指定）";
+    if (!byPacker[packer]) byPacker[packer] = {};
+    byPacker[packer][r.orderType + "|" + r.orderId] = r;
+  });
+
+  var packerNames = Object.keys(byPacker).sort(function(a, b) {
+    return Object.keys(byPacker[b]).length - Object.keys(byPacker[a]).length;
+  });
+
+  html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+  packerNames.forEach(function(packer, pi) {
+    var orders = Object.keys(byPacker[packer]).map(function(k) { return byPacker[packer][k]; });
+    var pid = "packstats-box-" + pi;
+    html += '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="packStatsToggle(\'' + pid + '\')">';
+    html += '<span style="font-weight:600;">' + esc(packer) + '</span>';
+    html += '<span style="color:var(--accent);font-weight:700;">' + orders.length + ' 單</span>';
+    html += '</div>';
+    html += '<div id="' + pid + '" style="display:none;margin-top:8px;">';
+    orders.forEach(function(o) {
+      html += '<div style="padding:6px 0;border-top:1px dashed var(--border);font-size:13px;">';
+      html += '<div><b>' + esc(o.orderType) + '</b>　' + esc(o.orderId) + (o.customer ? '　客戶：' + esc(o.customer) : '') + '</div>';
+      html += '<div style="color:var(--text-muted);margin-top:2px;">' + esc(o.itemsSummary) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
 // ========== 標籤列印（訂單卡片裡直接勾選品項，印B6標籤，一張切5個）==========
 function sgTagPrint(orderIdx) {
   var card = document.getElementById('sg-card-' + orderIdx);
@@ -3155,7 +3282,14 @@ async function sgSavePackStatus(i, field, value, packer) {
   var o = siteGiantOrders[i];
   if (!o) return;
   try {
-    var res = await gasAPI({ action: 'saveSgPackStatus', order_id: o.order_id, field: field, value: value, packer: packer || '' });
+    var params = { action: 'saveSgPackStatus', order_id: o.order_id, field: field, value: value, packer: packer || '' };
+    // 打勾「已包貨」那次順便帶商品明細給後端記歷史，主管統計頁才查得到；其他情況（取消勾選/安排勾選）不需要
+    if (field === 'packed' && value) {
+      params.marketplace_order_id = o.marketplace_order_id || o.order_id || '';
+      params.recipient_name = o.recipient_name || '';
+      params.items_summary = (o.items || []).map(function(it) { return (it.name || '') + ' x' + (it.qty || ''); }).join('、');
+    }
+    var res = await gasAPI(params);
     if (res && res.ok) {
       if (field === 'arranged') {
         o.arranged = value;

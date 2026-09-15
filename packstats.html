@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>包貨統計｜雋永紙藝</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f5f2; --surface: #ffffff; --border: #e0dbd4; --border-strong: #c8c2ba;
+    --text: #1a1814; --text-muted: #7a7570; --accent: #2d2926; --accent-light: #f0ede8;
+    --danger: #c0392b; --radius: 10px; --radius-sm: 6px; --shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  body { font-family: "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem 4rem; }
+  .app { width: 100%; max-width: 560px; }
+  .header { margin-bottom: 1.5rem; }
+  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: 1px; }
+  .header p { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 1rem; }
+  input[type="password"], select { font-family: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; outline: none; width: 100%; -webkit-appearance: none; }
+  input[type="password"]:focus, select:focus { border-color: var(--accent); }
+  button { font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer; border-radius: var(--radius-sm); padding: 10px 18px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); -webkit-tap-highlight-color: transparent; }
+  button:active { opacity: 0.7; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); width: 100%; padding: 13px; font-size: 16px; letter-spacing: 1px; margin-top: 10px; }
+  .status { font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0 4px; }
+  .status.error { color: var(--danger); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .packer-box { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 8px; }
+  .packer-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .packer-head span.name { font-weight: 600; }
+  .packer-head span.count { color: var(--accent); font-weight: 700; }
+  .order-row { padding: 6px 0; border-top: 1px dashed var(--border); font-size: 13px; }
+  .order-row .items { color: var(--text-muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<div class="app" id="login-gate">
+  <div class="header"><h1>📊 包貨統計</h1><p>雋永紙藝 · 僅供查看，無其他功能</p></div>
+  <div class="card">
+    <div class="field-label" style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">請輸入查看密碼</div>
+    <input type="password" id="login-pwd" placeholder="密碼" />
+    <div id="login-error" class="status error"></div>
+    <button class="primary" id="login-btn" onclick="doLogin()">查看</button>
+  </div>
+</div>
+
+<div class="app" id="app-main" style="display:none;">
+  <div class="header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <h1>📊 包貨統計</h1>
+      <p>每月各包貨人筆數、訂單與商品明細（僅 2026/09/15 起累積的資料）</p>
+    </div>
+    <button onclick="doLogout()" style="font-size:13px;padding:6px 12px;">登出</button>
+  </div>
+  <div class="card" id="content">
+    <div class="status"><span class="spinner"></span>載入中...</div>
+  </div>
+</div>
+
+<script>
+var GAS_URL = "https://script.google.com/macros/s/AKfycbyRV0go7bFYTQkPwsSt7AQz1Lp2aEbaR2UXeaUgm_D0sMI9EwjFDYNzkzBvcGOwFpMBMA/exec";
+
+function esc(str) {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function getPwd() { return sessionStorage.getItem("packstats_pwd") || ""; }
+function setPwd(p) { sessionStorage.setItem("packstats_pwd", p); }
+function clearPwd() { sessionStorage.removeItem("packstats_pwd"); }
+
+// 跟主系統一樣：GAS /exec 轉址偶爾會卡到失效網址、回傳 HTML 而非 JSON，自動重試 2 次再放棄
+async function fetchStats(pwd, _retryCount) {
+  var url = GAS_URL + "?action=getPackStatsForManager&pwd=" + encodeURIComponent(pwd);
+  var res = await fetch(url, { cache: "no-store" });
+  var text = await res.text();
+  var data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    var retryCount = _retryCount || 0;
+    if (retryCount < 2) {
+      await new Promise(function(r) { setTimeout(r, 500 * (retryCount + 1)); });
+      return fetchStats(pwd, retryCount + 1);
+    }
+    throw new Error("伺服器回應異常，請稍後再試或重新整理頁面");
+  }
+  return data;
+}
+
+var packStatsRecords = [];
+var packStatsSelectedMonth = null;
+
+async function doLogin() {
+  var pwdEl = document.getElementById("login-pwd");
+  var errEl = document.getElementById("login-error");
+  var btn = document.getElementById("login-btn");
+  var pwd = pwdEl.value.trim();
+  if (!pwd) { errEl.textContent = "請輸入密碼"; return; }
+  btn.disabled = true; btn.textContent = "查看中...";
+  errEl.textContent = "";
+  try {
+    var data = await fetchStats(pwd);
+    if (!data || data.ok === false) {
+      errEl.textContent = (data && data.error) || "密碼錯誤";
+      btn.disabled = false; btn.textContent = "查看";
+      return;
+    }
+    setPwd(pwd);
+    packStatsRecords = data.records || [];
+    showApp();
+    renderStats();
+  } catch (e) {
+    errEl.textContent = e.message;
+    btn.disabled = false; btn.textContent = "查看";
+  }
+}
+
+function doLogout() {
+  clearPwd();
+  document.getElementById("login-gate").style.display = "block";
+  document.getElementById("app-main").style.display = "none";
+  document.getElementById("login-pwd").value = "";
+}
+
+function showApp() {
+  document.getElementById("login-gate").style.display = "none";
+  document.getElementById("app-main").style.display = "block";
+}
+
+function monthKey(timeStr) { return (timeStr || "").substring(0, 7); }
+
+function onMonthChange(m) {
+  packStatsSelectedMonth = m;
+  renderStats();
+}
+
+function toggleBox(id) {
+  var box = document.getElementById(id);
+  if (!box) return;
+  box.style.display = (box.style.display === "none") ? "block" : "none";
+}
+
+function renderStats() {
+  var el = document.getElementById("content");
+  var months = {};
+  packStatsRecords.forEach(function(r) {
+    var m = monthKey(r.time);
+    if (m) months[m] = true;
+  });
+  var monthList = Object.keys(months).sort().reverse();
+  if (!packStatsSelectedMonth || monthList.indexOf(packStatsSelectedMonth) < 0) {
+    packStatsSelectedMonth = monthList[0] || "";
+  }
+
+  if (!monthList.length) {
+    el.innerHTML = '<div class="status">目前還沒有任何包貨記錄</div>';
+    return;
+  }
+
+  var html = '<select onchange="onMonthChange(this.value)" style="margin-bottom:12px;">';
+  monthList.forEach(function(m) {
+    html += '<option value="' + m + '"' + (m === packStatsSelectedMonth ? " selected" : "") + '>' + m + '</option>';
+  });
+  html += '</select>';
+
+  var monthRecords = packStatsRecords.filter(function(r) { return monthKey(r.time) === packStatsSelectedMonth; });
+  var byPacker = {};
+  monthRecords.forEach(function(r) {
+    var packer = r.packer || "（未指定）";
+    if (!byPacker[packer]) byPacker[packer] = {};
+    byPacker[packer][r.orderType + "|" + r.orderId] = r;
+  });
+
+  var packerNames = Object.keys(byPacker).sort(function(a, b) {
+    return Object.keys(byPacker[b]).length - Object.keys(byPacker[a]).length;
+  });
+
+  packerNames.forEach(function(packer, pi) {
+    var orders = Object.keys(byPacker[packer]).map(function(k) { return byPacker[packer][k]; });
+    var pid = "box-" + pi;
+    html += '<div class="packer-box">';
+    html += '<div class="packer-head" onclick="toggleBox(\'' + pid + '\')">';
+    html += '<span class="name">' + esc(packer) + '</span>';
+    html += '<span class="count">' + orders.length + ' 單</span>';
+    html += '</div>';
+    html += '<div id="' + pid + '" style="display:none;margin-top:8px;">';
+    orders.forEach(function(o) {
+      html += '<div class="order-row">';
+      html += '<div><b>' + esc(o.orderType) + '</b>　' + esc(o.orderId) + (o.customer ? '　客戶：' + esc(o.customer) : '') + '</div>';
+      html += '<div class="items">' + esc(o.itemsSummary) + '</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+
+  el.innerHTML = html;
+}
+
+// 已有密碼就直接嘗試載入，不用每次都重打
+(function init() {
+  var pwd = getPwd();
+  if (!pwd) return;
+  fetchStats(pwd).then(function(data) {
+    if (data && data.ok !== false) {
+      packStatsRecords = data.records || [];
+      showApp();
+      renderStats();
+    } else {
+      clearPwd();
+    }
+  }).catch(function() { clearPwd(); });
+})();
+</script>
+</body>
+</html>

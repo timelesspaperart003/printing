@@ -461,12 +461,17 @@ var DEFAULT_POST_IDX = 0;      // 預設寄件郵局的 index
 var SELECTED_POST_IDX = 0;     // 目前選中的寄件郵局 index
 
 // gasAPI：自動帶上 api_key
-async function gasAPI(params, _retryCount) {
+// method: 'GET'(預設，參數塞網址) 或 'POST'(參數放請求本文)。
+// GET 網址有長度上限——帶圖片網址/長文字的參數（例如包貨記錄的 items_json）容易整個被默默截斷丟掉，
+// 這種呼叫要用 gasAPIPost，不能用 gasAPI。GAS 端 e.parameter 兩種都讀得到，不用改後端。
+async function gasCall_(params, method, _retryCount) {
   var withKey = Object.assign({}, params, { key: getApiKey() });
-  var url = GAS_URL + "?" + Object.keys(withKey).map(function(k) {
+  var qs = Object.keys(withKey).map(function(k) {
     return encodeURIComponent(k) + "=" + encodeURIComponent(withKey[k]);
   }).join("&");
-  var res = await fetch(url, { cache: "no-store" });
+  var res = (method === 'POST')
+    ? await fetch(GAS_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: qs, cache: "no-store" })
+    : await fetch(GAS_URL + "?" + qs, { cache: "no-store" });
   var text = await res.text();
   var data;
   try {
@@ -477,7 +482,7 @@ async function gasAPI(params, _retryCount) {
     var retryCount = _retryCount || 0;
     if (retryCount < 2) {
       await new Promise(function(r) { setTimeout(r, 500 * (retryCount + 1)); });
-      return gasAPI(params, retryCount + 1);
+      return gasCall_(params, method, retryCount + 1);
     }
     throw new Error('伺服器回應異常（非 JSON），請稍後再試或重新整理頁面');
   }
@@ -489,6 +494,12 @@ async function gasAPI(params, _retryCount) {
     throw new Error('Unauthorized');
   }
   return data;
+}
+async function gasAPI(params, _retryCount) {
+  return gasCall_(params, 'GET', _retryCount);
+}
+async function gasAPIPost(params, _retryCount) {
+  return gasCall_(params, 'POST', _retryCount);
 }
 
 async function preloadShippingData() {
@@ -2412,7 +2423,7 @@ function doPrint() {
   // 沒有勾人就不記；同一張單重複列印會各記一筆，統計頁需自行去重
   if (staffChecked.length > 0) {
     var parsedForLog = parseItemText(cleanItemText(itemTextVal));
-    gasAPI({
+    gasAPIPost({
       action: 'logTaskPack',
       staff_names: staffChecked.join(','),
       title: fieldTitle,
@@ -3369,7 +3380,8 @@ async function sgSavePackStatus(i, field, value, packer) {
       params.items_json = JSON.stringify((o.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: it.img || '' }; }));
       params.channel_name = sgChannelLabel(o.channel_name) || o.channel_name || '';
     }
-    var res = await gasAPI(params);
+    // 用 POST(不是 gasAPI 的 GET)：已包貨那次的 items_json 帶了圖片網址，網址塞太長 GET 會被默默截斷丟掉
+    var res = await gasAPIPost(params);
     if (res && res.ok) {
       if (field === 'arranged') {
         o.arranged = value;

@@ -2411,12 +2411,14 @@ function doPrint() {
   // 主管統計用：列印出貨單當下記一筆包貨記錄（每位勾選的出貨人員各記一筆）。
   // 沒有勾人就不記；同一張單重複列印會各記一筆，統計頁需自行去重
   if (staffChecked.length > 0) {
+    var parsedForLog = parseItemText(cleanItemText(itemTextVal));
     gasAPI({
       action: 'logTaskPack',
       staff_names: staffChecked.join(','),
       title: fieldTitle,
       customer: (currentTask && currentTask.contactNotionName) || '',
-      items_summary: itemTextVal
+      items_summary: itemTextVal,
+      items_json: JSON.stringify((parsedForLog.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: '' }; }))
     }).catch(function(e) { console.warn('記錄包貨失敗', e); });
   }
 
@@ -3002,6 +3004,32 @@ function packStatsMonthKey(timeStr) {
   return (timeStr || "").substring(0, 7); // "yyyy-MM-dd HH:mm:ss" → "yyyy-MM"
 }
 
+// 商品明細：優先用 itemsJson 畫圖文條列(圖/名稱/數量各一行)，跟訂單卡片同一種視覺；
+// 解析失敗或沒有(舊資料/Notion快印沒圖)就退回純文字摘要
+function packStatsItemsHtml(o) {
+  var items = null;
+  if (o.itemsJson) {
+    try { items = JSON.parse(o.itemsJson); } catch (e) { items = null; }
+  }
+  if (!items || !items.length) {
+    return '<div style="color:var(--text-muted);margin-top:2px;">' + esc(o.itemsSummary || '') + '</div>';
+  }
+  var html = '<div style="margin-top:4px;display:flex;flex-direction:column;gap:4px;">';
+  items.forEach(function(it) {
+    html += '<div style="display:flex;align-items:center;gap:8px;">';
+    if (it.img) {
+      html += '<img src="' + esc(it.img) + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--bg);" />';
+    } else {
+      html += '<div style="width:36px;height:36px;flex-shrink:0;background:var(--bg);border-radius:6px;"></div>';
+    }
+    html += '<div style="flex:1;min-width:0;color:var(--text-muted);">' + esc(it.name || '') + '</div>';
+    html += '<div style="flex-shrink:0;font-weight:600;">x' + esc(String(it.qty || '')) + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 function onPackStatsMonthChange(m) {
   packStatsSelectedMonth = m;
   renderPackStats();
@@ -3061,7 +3089,7 @@ function renderPackStats() {
         + (o.channel ? '　' + esc(o.channel) : '')
         + (o.time ? '　' + esc(o.time.substring(0, 10)) : '')
         + (o.customer ? '　客戶：' + esc(o.customer) : '') + '</div>';
-      html += '<div style="color:var(--text-muted);margin-top:2px;">' + esc(o.itemsSummary) + '</div>';
+      html += packStatsItemsHtml(o);
       html += '</div>';
     });
     html += '</div>';
@@ -3338,6 +3366,7 @@ async function sgSavePackStatus(i, field, value, packer) {
       params.marketplace_order_id = o.marketplace_order_id || o.order_id || '';
       params.recipient_name = o.recipient_name || '';
       params.items_summary = (o.items || []).map(function(it) { return (it.name || '') + ' x' + (it.qty || ''); }).join('、');
+      params.items_json = JSON.stringify((o.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: it.img || '' }; }));
       params.channel_name = sgChannelLabel(o.channel_name) || o.channel_name || '';
     }
     var res = await gasAPI(params);

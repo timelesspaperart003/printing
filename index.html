@@ -3105,17 +3105,42 @@ function getTagFontSize() {
 function setTagFontSize(v) {
   localStorage.setItem('tagLabelFontSize', v);
 }
+
+// 兩台標籤機切換：'multi' = 原本那台(100x150mm一張切5個)；'single' = 新的那台(固定10x3cm，一張一個品名)
+// 三個列印入口(SiteGiant卡片/出貨單列印任務頁/Notion快印)共用同一個 localStorage 設定
+function getTagLabelMode() {
+  return (localStorage.getItem('tagLabelMode') === 'single') ? 'single' : 'multi';
+}
+function tagModeBtnStyle(active) {
+  return 'flex:1;padding:4px 6px;font-size:11px;border-radius:6px;border:1px solid var(--border-strong);cursor:pointer;'
+    + (active ? 'background:var(--accent);color:#fff;border-color:var(--accent);' : 'background:var(--surface);color:var(--text);');
+}
+function setTagLabelMode(mode, idSuffix) {
+  localStorage.setItem('tagLabelMode', mode);
+  var multiBtn = document.getElementById('tagmode-multi-' + idSuffix);
+  var singleBtn = document.getElementById('tagmode-single-' + idSuffix);
+  if (multiBtn) multiBtn.style.cssText = tagModeBtnStyle(mode === 'multi');
+  if (singleBtn) singleBtn.style.cssText = tagModeBtnStyle(mode === 'single');
+}
+
 function tagFontSliderHtml(idSuffix) {
   var v = getTagFontSize();
+  var mode = getTagLabelMode();
   return '<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:6px;">'
     + '<span style="white-space:nowrap;">標籤字體</span>'
     + '<input type="range" min="10" max="48" value="' + v + '" id="tagfont-' + idSuffix + '" style="flex:1;" '
     + 'oninput="document.getElementById(\'tagfontval-' + idSuffix + '\').textContent=this.value;setTagFontSize(this.value);" />'
     + '<span id="tagfontval-' + idSuffix + '" style="width:24px;text-align:right;">' + v + '</span>pt'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:6px;">'
+    + '<span style="white-space:nowrap;">標籤機</span>'
+    + '<button type="button" id="tagmode-multi-' + idSuffix + '" onclick="setTagLabelMode(\'multi\',\'' + idSuffix + '\')" style="' + tagModeBtnStyle(mode === 'multi') + '">5合一(原尺寸)</button>'
+    + '<button type="button" id="tagmode-single-' + idSuffix + '" onclick="setTagLabelMode(\'single\',\'' + idSuffix + '\')" style="' + tagModeBtnStyle(mode === 'single') + '">單張10×3cm</button>'
     + '</div>';
 }
 
 function sgPrintTagLabels(names) {
+  if (getTagLabelMode() === 'single') return sgPrintTagLabelsSingle(names);
   var PER_SHEET = 5;
   var fontSize = getTagFontSize();
   var html = '';
@@ -3148,6 +3173,34 @@ function sgPrintTagLabels(names) {
     ".sgtag-text{font-size:" + fontSize + "pt;font-weight:700;white-space:nowrap;text-align:center;}"
   ].join("");
   sgOpenPrint('標籤列印', css, html);
+}
+
+// 新的那台標籤機：固定 10x3cm(100mm x 30mm)，一張標籤只印一個品名，不用切
+function sgPrintTagLabelsSingle(names) {
+  var fontSize = getTagFontSize();
+  var html = '';
+  names.forEach(function(n) {
+    html += '<div class="sgtag-single"><span class="sgtag-text">' + sgEsc(n) + '</span></div>';
+  });
+  // 跟原本一樣：不自動換行，超過寬度就自動縮小字體到單行塞得下為止
+  html += '<script>(function(){'
+    + 'document.querySelectorAll(".sgtag-text").forEach(function(t){'
+    + 'var cell=t.parentElement;'
+    + 'var cs=getComputedStyle(cell);'
+    + 'var avail=cell.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);'
+    + 'var size=' + fontSize + ';'
+    + 'while(t.scrollWidth>avail&&size>6){size-=0.5;t.style.fontSize=size+"pt";}'
+    + '});'
+    + '})();</' + 'script>';
+  var css = [
+    "*{box-sizing:border-box;margin:0;padding:0;}",
+    "body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;}",
+    "@page{size:100mm 30mm;margin:0;}",
+    ".sgtag-single{width:100mm;height:30mm;display:flex;align-items:center;justify-content:center;padding:3mm;overflow:hidden;page-break-after:always;}",
+    ".sgtag-single:last-child{page-break-after:auto;}",
+    ".sgtag-text{font-size:" + fontSize + "pt;font-weight:700;white-space:nowrap;text-align:center;}"
+  ].join("");
+  sgOpenPrint('標籤列印(10x3cm)', css, html);
 }
 
 function sgFilter() {

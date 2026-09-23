@@ -3007,12 +3007,6 @@ function onPackStatsMonthChange(m) {
   renderPackStats();
 }
 
-function packStatsToggle(id) {
-  var box = document.getElementById(id);
-  if (!box) return;
-  box.style.display = (box.style.display === "none") ? "block" : "none";
-}
-
 function renderPackStats() {
   var el = document.getElementById("packstats-content");
   var months = {};
@@ -3052,18 +3046,21 @@ function renderPackStats() {
   });
 
   html += '<div style="display:flex;flex-direction:column;gap:8px;">';
-  packerNames.forEach(function(packer, pi) {
-    var orders = Object.keys(byPacker[packer]).map(function(k) { return byPacker[packer][k]; });
-    var pid = "packstats-box-" + pi;
+  packerNames.forEach(function(packer) {
+    var orders = Object.keys(byPacker[packer]).map(function(k) { return byPacker[packer][k]; })
+      .sort(function(a, b) { return (a.time || "").localeCompare(b.time || ""); });
     html += '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="packStatsToggle(\'' + pid + '\')">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
     html += '<span style="font-weight:600;">' + esc(packer) + '</span>';
     html += '<span style="color:var(--accent);font-weight:700;">' + orders.length + ' 單</span>';
     html += '</div>';
-    html += '<div id="' + pid + '" style="display:none;margin-top:8px;">';
+    html += '<div style="margin-top:8px;">';
     orders.forEach(function(o) {
       html += '<div style="padding:6px 0;border-top:1px dashed var(--border);font-size:13px;">';
-      html += '<div><b>' + esc(o.orderType) + '</b>　' + esc(o.orderId) + (o.customer ? '　客戶：' + esc(o.customer) : '') + '</div>';
+      html += '<div><b>' + esc(o.orderType) + '</b>　' + esc(o.orderId)
+        + (o.channel ? '　' + esc(o.channel) : '')
+        + (o.time ? '　' + esc(o.time.substring(0, 10)) : '')
+        + (o.customer ? '　客戶：' + esc(o.customer) : '') + '</div>';
       html += '<div style="color:var(--text-muted);margin-top:2px;">' + esc(o.itemsSummary) + '</div>';
       html += '</div>';
     });
@@ -3109,7 +3106,7 @@ function setTagFontSize(v) {
 // 兩台標籤機切換：'multi' = 原本那台(100x150mm一張切5個)；'single' = 新的那台(固定10x3cm，一張一個品名)
 // 三個列印入口(SiteGiant卡片/出貨單列印任務頁/Notion快印)共用同一個 localStorage 設定
 function getTagLabelMode() {
-  return (localStorage.getItem('tagLabelMode') === 'single') ? 'single' : 'multi';
+  return (localStorage.getItem('tagLabelMode') === 'multi') ? 'multi' : 'single';
 }
 function tagModeBtnStyle(active) {
   return 'flex:1;padding:4px 6px;font-size:11px;border-radius:6px;border:1px solid var(--border-strong);cursor:pointer;'
@@ -3341,6 +3338,7 @@ async function sgSavePackStatus(i, field, value, packer) {
       params.marketplace_order_id = o.marketplace_order_id || o.order_id || '';
       params.recipient_name = o.recipient_name || '';
       params.items_summary = (o.items || []).map(function(it) { return (it.name || '') + ' x' + (it.qty || ''); }).join('、');
+      params.channel_name = sgChannelLabel(o.channel_name) || o.channel_name || '';
     }
     var res = await gasAPI(params);
     if (res && res.ok) {

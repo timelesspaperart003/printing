@@ -3271,9 +3271,9 @@ function sgPrintTagLabelsSingle(names) {
   var fontSize = getTagFontSize();
   var html = '';
   names.forEach(function(n) {
-    html += '<div class="sgtag-single"><div class="sgtag-inner"><span class="sgtag-text">' + sgEsc(n) + '</span></div></div>';
+    html += '<div class="sgtag-single"><span class="sgtag-text">' + sgEsc(n) + '</span></div>';
   });
-  // 跟原本一樣：不自動換行，超過寬度就自動縮小字體到單行塞得下為止（用旋轉前的 .sgtag-inner 寬度量測）
+  // 不自動換行，超過寬度就自動縮小字體到單行塞得下為止
   html += '<script>(function(){'
     + 'document.querySelectorAll(".sgtag-text").forEach(function(t){'
     + 'var cell=t.parentElement;'
@@ -3283,15 +3283,13 @@ function sgPrintTagLabelsSingle(names) {
     + 'while(t.scrollWidth>avail&&size>6){size-=0.5;t.style.fontSize=size+"pt";}'
     + '});'
     + '})();</' + 'script>';
-  // 標籤機實際吃的紙是直的(30mm寬x100mm高)，印出來會被轉成3x10；
-  // 這裡讓 @page 照實際紙張方向宣告，內容框維持邏輯上的 100x30，用 CSS 轉90度貼合，印出來才會是橫的10x3。
+  // 這台標籤機實際裁切就是照物理標籤紙尺寸(10x3橫向)走，不需要轉90度——上一版加的旋轉是誤判，這裡復原成原本的樣子
   var css = [
     "*{box-sizing:border-box;margin:0;padding:0;}",
     "body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;}",
-    "@page{size:30mm 100mm;margin:0;}",
-    ".sgtag-single{width:30mm;height:100mm;position:relative;overflow:hidden;page-break-after:always;}",
+    "@page{size:100mm 30mm;margin:0;}",
+    ".sgtag-single{width:100mm;height:30mm;display:flex;align-items:center;justify-content:center;padding:3mm;overflow:hidden;page-break-after:always;}",
     ".sgtag-single:last-child{page-break-after:auto;}",
-    ".sgtag-inner{width:100mm;height:30mm;display:flex;align-items:center;justify-content:center;padding:3mm;overflow:hidden;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg);}",
     ".sgtag-text{font-size:" + fontSize + "pt;font-weight:700;white-space:nowrap;text-align:center;}"
   ].join("");
   sgOpenPrint('標籤列印(10x3cm)', css, html);

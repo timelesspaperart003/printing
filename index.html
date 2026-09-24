@@ -461,17 +461,20 @@ var DEFAULT_POST_IDX = 0;      // 預設寄件郵局的 index
 var SELECTED_POST_IDX = 0;     // 目前選中的寄件郵局 index
 
 // gasAPI：自動帶上 api_key
-// method: 'GET'(預設，參數塞網址) 或 'POST'(參數放請求本文)。
-// GET 網址有長度上限——帶圖片網址/長文字的參數（例如包貨記錄的 items_json）容易整個被默默截斷丟掉，
-// 這種呼叫要用 gasAPIPost，不能用 gasAPI。GAS 端 e.parameter 兩種都讀得到，不用改後端。
-async function gasCall_(params, method, _retryCount) {
+// method: 'GET'(預設，參數塞網址) 或 'POST'。其餘參數(action/order_id/...)一律照舊放在網址查詢字串，
+// GAS 端 e.parameter 兩種方法都讀得到，這部分不用改後端。
+// rawBody 是另外走的一條路：POST 的「請求本文」(e.postData.contents)，給 items_json 這種可能很長、
+// 帶圖片網址的資料專用——實測過 e.parameter 傳長字串不可靠(內容會不見)，postData.contents 是
+// Apps Script 保證原封不動拿得到的原始內容，不會有這個問題。text/plain 也不會觸發 CORS 預檢。
+async function gasCall_(params, method, rawBody, _retryCount) {
   var withKey = Object.assign({}, params, { key: getApiKey() });
   var qs = Object.keys(withKey).map(function(k) {
     return encodeURIComponent(k) + "=" + encodeURIComponent(withKey[k]);
   }).join("&");
+  var url = GAS_URL + "?" + qs;
   var res = (method === 'POST')
-    ? await fetch(GAS_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: qs, cache: "no-store" })
-    : await fetch(GAS_URL + "?" + qs, { cache: "no-store" });
+    ? await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: rawBody || "", cache: "no-store" })
+    : await fetch(url, { cache: "no-store" });
   var text = await res.text();
   var data;
   try {
@@ -482,7 +485,7 @@ async function gasCall_(params, method, _retryCount) {
     var retryCount = _retryCount || 0;
     if (retryCount < 2) {
       await new Promise(function(r) { setTimeout(r, 500 * (retryCount + 1)); });
-      return gasCall_(params, method, retryCount + 1);
+      return gasCall_(params, method, rawBody, retryCount + 1);
     }
     throw new Error('伺服器回應異常（非 JSON），請稍後再試或重新整理頁面');
   }
@@ -496,10 +499,11 @@ async function gasCall_(params, method, _retryCount) {
   return data;
 }
 async function gasAPI(params, _retryCount) {
-  return gasCall_(params, 'GET', _retryCount);
+  return gasCall_(params, 'GET', null, _retryCount);
 }
-async function gasAPIPost(params, _retryCount) {
-  return gasCall_(params, 'POST', _retryCount);
+// rawBody：放進 POST 請求本文的原始文字(給 items_json 用)，GAS 端用 e.postData.contents 讀
+async function gasAPIPost(params, rawBody, _retryCount) {
+  return gasCall_(params, 'POST', rawBody, _retryCount);
 }
 
 async function preloadShippingData() {
@@ -2423,14 +2427,14 @@ function doPrint() {
   // 沒有勾人就不記；同一張單重複列印會各記一筆，統計頁需自行去重
   if (staffChecked.length > 0) {
     var parsedForLog = parseItemText(cleanItemText(itemTextVal));
+    var taskItemsJsonBody = JSON.stringify((parsedForLog.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: '' }; }));
     gasAPIPost({
       action: 'logTaskPack',
       staff_names: staffChecked.join(','),
       title: fieldTitle,
       customer: (currentTask && currentTask.contactNotionName) || '',
-      items_summary: itemTextVal,
-      items_json: JSON.stringify((parsedForLog.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: '' }; }))
-    }).catch(function(e) { console.warn('記錄包貨失敗', e); });
+      items_summary: itemTextVal
+    }, taskItemsJsonBody).catch(function(e) { console.warn('記錄包貨失敗', e); });
   }
 
   // ======= 代收貨款判斷 =======
@@ -3372,16 +3376,17 @@ async function sgSavePackStatus(i, field, value, packer) {
   if (!o) return;
   try {
     var params = { action: 'saveSgPackStatus', order_id: o.order_id, field: field, value: value, packer: packer || '' };
+    var itemsJsonBody = '';
     // 打勾「已包貨」那次順便帶商品明細給後端記歷史，主管統計頁才查得到；其他情況（取消勾選/安排勾選）不需要
     if (field === 'packed' && value) {
       params.marketplace_order_id = o.marketplace_order_id || o.order_id || '';
       params.recipient_name = o.recipient_name || '';
       params.items_summary = (o.items || []).map(function(it) { return (it.name || '') + ' x' + (it.qty || ''); }).join('、');
-      params.items_json = JSON.stringify((o.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: it.img || '' }; }));
       params.channel_name = sgChannelLabel(o.channel_name) || o.channel_name || '';
+      // items_json 帶圖片網址、可能很長，走 POST 請求本文，不放進網址查詢字串裡
+      itemsJsonBody = JSON.stringify((o.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: it.img || '' }; }));
     }
-    // 用 POST(不是 gasAPI 的 GET)：已包貨那次的 items_json 帶了圖片網址，網址塞太長 GET 會被默默截斷丟掉
-    var res = await gasAPIPost(params);
+    var res = await gasAPIPost(params, itemsJsonBody);
     if (res && res.ok) {
       if (field === 'arranged') {
         o.arranged = value;

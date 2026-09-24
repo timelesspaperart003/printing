@@ -3003,7 +3003,20 @@ function backFromSiteGiant() {
 
 // ========== 主管統計：包貨記錄依月份/包貨人分組（僅 admin 看得到入口）==========
 var packStatsRecords = [];
-var packStatsSelectedMonth = null;
+var packStatsFromDate = null; // "yyyy-mm-dd"
+var packStatsToDate = null;
+var packStatsFilterPacker = null; // null = 全部人員都顯示
+
+// 預設區間：這個月 1 號到月底
+function packStatsDefaultRange() {
+  var now = new Date();
+  var first = new Date(now.getFullYear(), now.getMonth(), 1);
+  var last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  function fmt(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  return { from: fmt(first), to: fmt(last) };
+}
 
 async function loadPackStats() {
   document.getElementById("view-search").style.display = "none";
@@ -3026,10 +3039,6 @@ function backFromPackStats() {
   document.getElementById("view-search").style.display = "block";
 }
 
-function packStatsMonthKey(timeStr) {
-  return (timeStr || "").substring(0, 7); // "yyyy-MM-dd HH:mm:ss" → "yyyy-MM"
-}
-
 // 商品明細：優先用 itemsJson 畫圖文條列(圖/名稱/數量各一行)，跟訂單卡片同一種視覺；
 // 解析失敗或沒有(舊資料/Notion快印沒圖)就退回純文字摘要
 function packStatsItemsHtml(o) {
@@ -3044,52 +3053,61 @@ function packStatsItemsHtml(o) {
   items.forEach(function(it) {
     html += '<div style="display:flex;align-items:center;gap:8px;">';
     if (it.img) {
-      html += '<img src="' + esc(it.img) + '" style="width:64px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--bg);" />';
+      html += '<img src="' + esc(it.img) + '" style="width:90px;height:90px;object-fit:cover;border-radius:8px;flex-shrink:0;background:var(--bg);" />';
     } else {
-      html += '<div style="width:64px;height:64px;flex-shrink:0;background:var(--bg);border-radius:6px;"></div>';
+      html += '<div style="width:90px;height:90px;flex-shrink:0;background:var(--bg);border-radius:8px;"></div>';
     }
-    html += '<div style="flex:1;min-width:0;color:var(--text-muted);">' + esc(it.name || '') + '</div>';
-    html += '<div style="flex-shrink:0;font-weight:600;">x' + esc(String(it.qty || '')) + '</div>';
+    html += '<div style="flex:1;min-width:0;font-size:14px;color:var(--text-muted);">' + esc(it.name || '') + '</div>';
+    html += '<div style="flex-shrink:0;font-size:15px;font-weight:600;">x' + esc(String(it.qty || '')) + '</div>';
     html += '</div>';
   });
   html += '</div>';
   return html;
 }
 
-function onPackStatsMonthChange(m) {
-  packStatsSelectedMonth = m;
+function onPackStatsDateChange() {
+  var f = document.getElementById("packstats-from");
+  var t = document.getElementById("packstats-to");
+  if (f) packStatsFromDate = f.value;
+  if (t) packStatsToDate = t.value;
+  renderPackStats();
+}
+
+function onPackStatsPackerFilterClick(packer) {
+  packStatsFilterPacker = (packStatsFilterPacker === packer) ? null : packer;
   renderPackStats();
 }
 
 function renderPackStats() {
   var el = document.getElementById("packstats-content");
-  var months = {};
-  packStatsRecords.forEach(function(r) {
-    var m = packStatsMonthKey(r.time);
-    if (m) months[m] = true;
-  });
-  var monthList = Object.keys(months).sort().reverse();
-  if (!packStatsSelectedMonth || monthList.indexOf(packStatsSelectedMonth) < 0) {
-    packStatsSelectedMonth = monthList[0] || "";
+  if (!packStatsRecords.length) {
+    el.innerHTML = '<div style="font-size:16px;font-weight:600;margin-bottom:10px;">📊 包貨統計</div>'
+      + '<div class="status">目前還沒有任何包貨記錄（從 2026/09/15 起累積，需要實際勾選已包貨或列印出貨單才會產生資料）</div>';
+    return;
+  }
+  if (!packStatsFromDate || !packStatsToDate) {
+    var def = packStatsDefaultRange();
+    packStatsFromDate = packStatsFromDate || def.from;
+    packStatsToDate = packStatsToDate || def.to;
   }
 
   var html = '<div style="font-size:16px;font-weight:600;margin-bottom:10px;">📊 包貨統計</div>';
-  if (!monthList.length) {
-    html += '<div class="status">目前還沒有任何包貨記錄（從 2026/09/15 起累積，需要實際勾選已包貨或列印出貨單才會產生資料）</div>';
-    el.innerHTML = html;
-    return;
-  }
 
-  html += '<select id="packstats-month-select" onchange="onPackStatsMonthChange(this.value)" style="margin-bottom:12px;width:100%;padding:8px;font-size:14px;">';
-  monthList.forEach(function(m) {
-    html += '<option value="' + m + '"' + (m === packStatsSelectedMonth ? " selected" : "") + '>' + m + '</option>';
+  // 日期區間篩選（預設本月，可自行改成任意區間）
+  html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">';
+  html += '<input type="date" id="packstats-from" value="' + packStatsFromDate + '" onchange="onPackStatsDateChange()" style="flex:1;padding:8px;font-size:14px;" />';
+  html += '<span style="color:var(--text-muted);">～</span>';
+  html += '<input type="date" id="packstats-to" value="' + packStatsToDate + '" onchange="onPackStatsDateChange()" style="flex:1;padding:8px;font-size:14px;" />';
+  html += '</div>';
+
+  var rangeRecords = packStatsRecords.filter(function(r) {
+    var d = (r.time || "").substring(0, 10);
+    return d && d >= packStatsFromDate && d <= packStatsToDate;
   });
-  html += '</select>';
 
-  // 同一張單(訂單類型+訂單編號)在這個月內去重只留最後一筆，避免重複列印/重複勾選讓筆數灌水
-  var monthRecords = packStatsRecords.filter(function(r) { return packStatsMonthKey(r.time) === packStatsSelectedMonth; });
+  // 同一張單(訂單類型+訂單編號)在這個區間內去重只留最後一筆，避免重複列印/重複勾選讓筆數灌水
   var byPacker = {};
-  monthRecords.forEach(function(r) {
+  rangeRecords.forEach(function(r) {
     var packer = r.packer || "（未指定）";
     if (!byPacker[packer]) byPacker[packer] = {};
     byPacker[packer][r.orderType + "|" + r.orderId] = r;
@@ -3099,19 +3117,41 @@ function renderPackStats() {
     return Object.keys(byPacker[b]).length - Object.keys(byPacker[a]).length;
   });
 
-  html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+  if (!packerNames.length) {
+    html += '<div class="status">這個日期區間沒有包貨記錄</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // 人員篩選：點一下只看該人員，再點一次(或點別人)可以換人／取消回全部
+  if (packStatsFilterPacker && packerNames.indexOf(packStatsFilterPacker) < 0) packStatsFilterPacker = null;
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">';
   packerNames.forEach(function(packer) {
+    var count = Object.keys(byPacker[packer]).length;
+    var active = (packStatsFilterPacker === packer);
+    html += '<button type="button" onclick="onPackStatsPackerFilterClick(&quot;' + esc(packer) + '&quot;)" style="padding:6px 14px;font-size:13px;border-radius:20px;border:1px solid var(--border-strong);cursor:pointer;'
+      + (active ? 'background:var(--accent);color:#fff;border-color:var(--accent);' : 'background:var(--surface);color:var(--text);') + '">'
+      + esc(packer) + '　' + count + '</button>';
+  });
+  html += '</div>';
+
+  var visiblePackers = packStatsFilterPacker ? [packStatsFilterPacker] : packerNames;
+
+  html += '<div style="display:flex;flex-direction:column;gap:18px;">';
+  visiblePackers.forEach(function(packer) {
     var orders = Object.keys(byPacker[packer]).map(function(k) { return byPacker[packer][k]; })
       .sort(function(a, b) { return (a.time || "").localeCompare(b.time || ""); });
-    html += '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-    html += '<span style="font-weight:600;">' + esc(packer) + '</span>';
-    html += '<span style="color:var(--accent);font-weight:700;">' + orders.length + ' 單</span>';
+    html += '<div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+    html += '<span style="font-weight:700;font-size:15px;">' + esc(packer) + '</span>';
+    html += '<span style="background:var(--accent);color:#fff;font-weight:700;font-size:13px;padding:3px 12px;border-radius:12px;">' + orders.length + ' 單</span>';
     html += '</div>';
-    html += '<div style="margin-top:8px;">';
-    orders.forEach(function(o) {
-      html += '<div style="padding:6px 0;border-top:1px dashed var(--border);font-size:13px;">';
-      html += '<div><b>' + esc(o.orderType) + '</b>　' + esc(o.orderId)
+    html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+    orders.forEach(function(o, oi) {
+      html += '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;background:var(--surface);">';
+      html += '<div style="font-size:13px;">'
+        + '<span style="display:inline-block;min-width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--accent-light);font-size:11px;font-weight:700;margin-right:6px;">' + (oi + 1) + '</span>'
+        + '<b>' + esc(o.orderType) + '</b>　' + esc(o.orderId)
         + (o.channel ? '　' + esc(o.channel) : '')
         + (o.time ? '　' + esc(o.time.substring(0, 10)) : '')
         + (o.customer ? '　客戶：' + esc(o.customer) : '') + '</div>';

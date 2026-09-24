@@ -145,9 +145,9 @@ function packStatsItemsHtml(o) {
   items.forEach(function(it) {
     html += '<div style="display:flex;align-items:center;gap:8px;">';
     if (it.img) {
-      html += '<img src="' + esc(it.img) + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--bg);" />';
+      html += '<img src="' + esc(it.img) + '" style="width:64px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--bg);" />';
     } else {
-      html += '<div style="width:36px;height:36px;flex-shrink:0;background:var(--bg);border-radius:6px;"></div>';
+      html += '<div style="width:64px;height:64px;flex-shrink:0;background:var(--bg);border-radius:6px;"></div>';
     }
     html += '<div style="flex:1;min-width:0;color:var(--text-muted);">' + esc(it.name || '') + '</div>';
     html += '<div style="flex-shrink:0;font-weight:600;">x' + esc(String(it.qty || '')) + '</div>';

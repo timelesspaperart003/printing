@@ -2428,13 +2428,24 @@ function doPrint() {
   if (staffChecked.length > 0) {
     var parsedForLog = parseItemText(cleanItemText(itemTextVal));
     var taskItemsJsonBody = JSON.stringify((parsedForLog.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: '' }; }));
-    gasAPIPost({
+    var taskLogParams = {
       action: 'logTaskPack',
       staff_names: staffChecked.join(','),
       title: fieldTitle,
       customer: (currentTask && currentTask.contactNotionName) || '',
       items_summary: itemTextVal
-    }, taskItemsJsonBody).catch(function(e) { console.warn('記錄包貨失敗', e); });
+    };
+    (async function() {
+      try {
+        var logRes = await gasAPIPost(taskLogParams, taskItemsJsonBody);
+        // 實測過 POST 本文(items_json)偶爾送不到後端，原因不明；沒收到就重送最多 2 次
+        var retry = 0;
+        while (logRes && logRes.ok && !logRes.itemsJsonReceived && retry < 2) {
+          retry++;
+          logRes = await gasAPIPost(taskLogParams, taskItemsJsonBody);
+        }
+      } catch (e) { console.warn('記錄包貨失敗', e); }
+    })();
   }
 
   // ======= 代收貨款判斷 =======
@@ -3033,9 +3044,9 @@ function packStatsItemsHtml(o) {
   items.forEach(function(it) {
     html += '<div style="display:flex;align-items:center;gap:8px;">';
     if (it.img) {
-      html += '<img src="' + esc(it.img) + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--bg);" />';
+      html += '<img src="' + esc(it.img) + '" style="width:64px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--bg);" />';
     } else {
-      html += '<div style="width:36px;height:36px;flex-shrink:0;background:var(--bg);border-radius:6px;"></div>';
+      html += '<div style="width:64px;height:64px;flex-shrink:0;background:var(--bg);border-radius:6px;"></div>';
     }
     html += '<div style="flex:1;min-width:0;color:var(--text-muted);">' + esc(it.name || '') + '</div>';
     html += '<div style="flex-shrink:0;font-weight:600;">x' + esc(String(it.qty || '')) + '</div>';
@@ -3387,6 +3398,13 @@ async function sgSavePackStatus(i, field, value, packer) {
       itemsJsonBody = JSON.stringify((o.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: it.img || '' }; }));
     }
     var res = await gasAPIPost(params, itemsJsonBody);
+    // 實測過 POST 本文(items_json)偶爾送不到後端，原因不明；後端回報沒收到就重送最多 2 次。
+    // 重試造成的重複列不影響統計，因為統計頁本來就會依訂單編號去重、只留最後一筆。
+    var jsonRetry = 0;
+    while (res && res.ok && field === 'packed' && value && !res.itemsJsonReceived && jsonRetry < 2) {
+      jsonRetry++;
+      res = await gasAPIPost(params, itemsJsonBody);
+    }
     if (res && res.ok) {
       if (field === 'arranged') {
         o.arranged = value;

@@ -3387,6 +3387,10 @@ async function sgSavePackStatus(i, field, value, packer) {
       itemsJsonBody = JSON.stringify((o.items || []).map(function(it) { return { name: it.name || '', qty: it.qty || '', img: it.img || '' }; }));
     }
     var res = await gasAPIPost(params, itemsJsonBody);
+    // 暫時除錯：確認前端送出的長度 vs 後端實際收到的長度，排查完會拿掉
+    if (field === 'packed' && value) {
+      console.log('[除錯] items_json 送出長度=' + itemsJsonBody.length + '，後端收到長度=' + (res && res._debugItemsJsonLen));
+    }
     if (res && res.ok) {
       if (field === 'arranged') {
         o.arranged = value;

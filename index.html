@@ -3191,7 +3191,7 @@ function sgTagAddQueue(orderIdx) {
 // 標籤字體大小滑動桿：存 localStorage，三個列印入口(SiteGiant卡片/出貨單列印任務頁/Notion快印)共用同一個設定
 function getTagFontSize() {
   var v = parseInt(localStorage.getItem('tagLabelFontSize'), 10);
-  return (!isNaN(v) && v >= 10 && v <= 48) ? v : 22;
+  return (!isNaN(v) && v >= 10 && v <= 72) ? v : 32;
 }
 function setTagFontSize(v) {
   localStorage.setItem('tagLabelFontSize', v);
@@ -3219,7 +3219,7 @@ function tagFontSliderHtml(idSuffix) {
   var mode = getTagLabelMode();
   return '<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:6px;">'
     + '<span style="white-space:nowrap;">標籤字體</span>'
-    + '<input type="range" min="10" max="48" value="' + v + '" id="tagfont-' + idSuffix + '" style="flex:1;" '
+    + '<input type="range" min="10" max="72" value="' + v + '" id="tagfont-' + idSuffix + '" style="flex:1;" '
     + 'oninput="document.getElementById(\'tagfontval-' + idSuffix + '\').textContent=this.value;setTagFontSize(this.value);" />'
     + '<span id="tagfontval-' + idSuffix + '" style="width:24px;text-align:right;">' + v + '</span>pt'
     + '</div>'
